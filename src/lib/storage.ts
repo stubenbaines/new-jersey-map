@@ -1,4 +1,6 @@
 import { STORAGE_KEY } from '../constants';
+import { normalizeTransform } from './mapTransform';
+import { DEFAULT_MAP_TRANSFORM } from '../types/state';
 import type { PersistedState } from '../types/state';
 
 const DEFAULT_STATE: PersistedState = {
@@ -6,11 +8,7 @@ const DEFAULT_STATE: PersistedState = {
   prefs: {
     showMunicipalityLabelsOverride: false,
   },
-  lastTransform: {
-    x: 0,
-    y: 0,
-    k: 1,
-  },
+  lastTransform: DEFAULT_MAP_TRANSFORM,
 };
 
 export function loadPersistedState(): PersistedState {
@@ -22,15 +20,13 @@ export function loadPersistedState(): PersistedState {
   try {
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     return {
-      visitedIds: Array.isArray(parsed.visitedIds) ? parsed.visitedIds.filter((value): value is string => typeof value === 'string') : [],
+      visitedIds: Array.isArray(parsed.visitedIds)
+        ? parsed.visitedIds.filter((value): value is string => typeof value === 'string')
+        : [],
       prefs: {
         showMunicipalityLabelsOverride: Boolean(parsed.prefs?.showMunicipalityLabelsOverride),
       },
-      lastTransform: {
-        x: Number(parsed.lastTransform?.x ?? 0),
-        y: Number(parsed.lastTransform?.y ?? 0),
-        k: Number(parsed.lastTransform?.k ?? 1),
-      },
+      lastTransform: normalizeTransform(parsed.lastTransform),
     };
   } catch {
     return DEFAULT_STATE;

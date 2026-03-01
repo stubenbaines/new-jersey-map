@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import NJMap from './components/NJMap';
 import { COLORS } from './constants';
+import { ZOOM_BUTTON_FACTOR, zoomAtViewportCenter } from './lib/mapTransform';
 import { loadPersistedState, savePersistedState } from './lib/storage';
 import type { NJGeometryData } from './types/data';
+import { DEFAULT_MAP_TRANSFORM } from './types/state';
 import type { MapTransform } from './types/state';
 
 function App() {
@@ -57,6 +59,7 @@ function App() {
 
   const municipalityCount = data?.meta.municipalityCount ?? 0;
   const countyCount = data?.meta.countyCount ?? 0;
+  const canUseMapControls = Boolean(data) && !error;
 
   return (
     <div className="app-shell" style={{ backgroundColor: COLORS.pageBackground }}>
@@ -75,17 +78,24 @@ function App() {
           <section className="sidebar-section">
             <h2>Map Controls</h2>
             <div className="button-stack">
-              <button disabled type="button">
+              <button
+                disabled={!canUseMapControls}
+                onClick={() => setTransform((previous) => zoomAtViewportCenter(previous, ZOOM_BUTTON_FACTOR))}
+                type="button"
+              >
                 Zoom In
               </button>
-              <button disabled type="button">
+              <button
+                disabled={!canUseMapControls}
+                onClick={() => setTransform((previous) => zoomAtViewportCenter(previous, 1 / ZOOM_BUTTON_FACTOR))}
+                type="button"
+              >
                 Zoom Out
               </button>
-              <button disabled type="button">
+              <button disabled={!canUseMapControls} onClick={() => setTransform(DEFAULT_MAP_TRANSFORM)} type="button">
                 Reset View
               </button>
             </div>
-            <p className="muted">Milestone 2 placeholder</p>
           </section>
 
           <section className="sidebar-section">
@@ -130,17 +140,6 @@ function App() {
               >
                 Toggle Label Override Flag
               </button>
-              <button
-                onClick={() =>
-                  setTransform((previous) => ({
-                    ...previous,
-                    k: previous.k >= 2.5 ? 1 : 2.5,
-                  }))
-                }
-                type="button"
-              >
-                Toggle Transform k (Mock)
-              </button>
             </div>
           </section>
         </aside>
@@ -152,7 +151,9 @@ function App() {
             <NJMap
               counties={data.counties}
               municipalities={data.municipalities}
+              onTransformChange={setTransform}
               selectedId={selectedId}
+              transform={transform}
               visitedIds={visitedIds}
             />
           ) : null}

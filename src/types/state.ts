@@ -4,6 +4,12 @@ export interface MapTransform {
   k: number;
 }
 
+export const DEFAULT_MAP_TRANSFORM: MapTransform = {
+  x: 0,
+  y: 0,
+  k: 1,
+};
+
 export interface AppPrefs {
   showMunicipalityLabelsOverride: boolean;
 }
