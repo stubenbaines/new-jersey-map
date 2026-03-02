@@ -140,3 +140,42 @@ Color guidance:
 - Intake format will be GeoJSON.
 - Last map transform persistence is included in MVP.
 - Base palette is black/white map with red visited fill, aligned with reference images in `samples/`.
+
+## 12) Milestone 8 — Label UX refinement (post-MVP)
+Goal:
+- Improve municipality label readability in dense areas (for example Camden County) while preserving current interaction/performance behavior.
+
+### M8-L1 Label text normalization (display only)
+- Normalize municipality label text before rendering:
+  - Remove trailing `Borough`.
+  - Replace trailing `Township` with `TWP`.
+- Keep canonical municipality names unchanged in search, tooltip, and data storage.
+
+### M8-L2 Compact label rendering
+- Reduce municipality label font size slightly from current baseline.
+- Support two-line wrapped labels using SVG text (`tspan`) where useful.
+- Prefer line breaks at spaces and avoid three-or-more-line label blocks.
+
+### M8-L3 Border-aware label placement
+- Detect municipalities that touch or are near the NJ outer state boundary.
+- Place their labels near the municipality edge so most of the label sits outside the dense map interior.
+- Use side-aware alignment (`text-anchor` and offsets) so labels remain readable and visually connected.
+- Example targets: Atlantic City, Wildwood.
+
+### M8-L4 Density controls
+- Add zoom-tiered municipality label density:
+  - At lower label zoom, show a reduced subset in dense areas.
+  - At higher zoom, allow fuller label coverage.
+- Add lightweight collision suppression (grid or bbox overlap filtering) for municipality labels.
+- Do not implement a full force/collision simulation engine.
+
+### M8-L5 County hot-spot tuning
+- Allow small per-county or per-municipality positional overrides for known dense regions (Camden, Hudson, Essex).
+- Keep overrides minimal and documented.
+
+### Milestone 8 acceptance criteria
+- Camden County is visibly more readable than current label behavior at default municipality-label zoom.
+- `Borough` is removed and `Township` is abbreviated to `TWP` in municipality labels.
+- Border municipalities can render labels with outward placement behavior.
+- Search/tooltip/export correctness remains intact and uses canonical names.
+- Pan/zoom remains smooth with labels enabled and no severe regression in interaction responsiveness.

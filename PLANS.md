@@ -130,6 +130,37 @@ Verification:
   - search and navigate
   - export PNG
 
+## Milestone 8 — Label UX refinement
+Tasks:
+- Implement municipality label text normalization for display-only labels:
+  - remove trailing `Borough`
+  - replace trailing `Township` with `TWP`
+- Add compact label formatting:
+  - reduce municipality label font size slightly
+  - allow two-line wrapping with SVG `tspan`
+  - avoid labels that require 3+ lines
+- Add border-aware placement:
+  - detect municipalities near the NJ outer border
+  - place labels with outward offsets and side-aware anchors
+- Add density management:
+  - introduce zoom-tiered municipality label density in dense regions
+  - add lightweight collision suppression (grid/bbox overlap filtering)
+- Add small documented hot-spot overrides for dense counties (Camden/Hudson/Essex).
+
+Exit criteria:
+- Camden County is visibly more readable at default municipality-label zoom than Milestone 5 behavior.
+- `Borough` is removed and `Township` is abbreviated to `TWP` in municipality labels.
+- Border municipalities (for example Atlantic City, Wildwood) can render outward-facing labels.
+- Search, tooltip, visited state, and export behavior remain functionally correct.
+- No severe pan/zoom performance regression with municipality labels visible.
+
+Verification:
+- Manual visual comparisons before/after in dense regions (Camden, Hudson, Essex).
+- Manual checks for display-name normalization correctness on representative municipalities.
+- Manual checks that tooltip/search still use canonical municipality names.
+- Manual export comparison to confirm label rendering in PNG matches on-screen state.
+- Performance sanity check while panning at label-heavy zoom levels.
+
 ## Risk register
 - Data property instability:
   - Mitigation: lock stable source ID mapping and document it in pipeline script.
