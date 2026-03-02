@@ -1,5 +1,5 @@
 import type { Geometry } from 'geojson';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import NJMap from './components/NJMap';
 import { COLORS, MAP_VIEWBOX, MUNICIPALITY_LABEL_ZOOM_THRESHOLD } from './constants';
 import {
@@ -7,6 +7,7 @@ import {
   computeGeometryBounds,
   computeGeometryCenter,
 } from './lib/mapGeometry';
+import { exportSvgAsPng } from './lib/exportPng';
 import { ZOOM_BUTTON_FACTOR, zoomAtViewportCenter } from './lib/mapTransform';
 import { loadPersistedState, savePersistedState } from './lib/storage';
 import type { NJGeometryData } from './types/data';
@@ -34,6 +35,8 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeResultIndex, setActiveResultIndex] = useState<number>(-1);
   const [hoverTooltip, setHoverTooltip] = useState<MunicipalityHoverTooltip | null>(null);
+  const [isExportingPng, setIsExportingPng] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const persisted = useMemo(() => loadPersistedState(), []);
   const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set(persisted.visitedIds));
@@ -41,6 +44,7 @@ function App() {
     persisted.prefs.showMunicipalityLabelsOverride,
   );
   const [transform, setTransform] = useState<MapTransform>(persisted.lastTransform);
+  const mapSvgElementRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -170,6 +174,23 @@ function App() {
     });
   }
 
+  async function handleExportPng(): Promise<void> {
+    if (!mapSvgElementRef.current) {
+      setExportError('Map is not ready for export yet.');
+      return;
+    }
+
+    setExportError(null);
+    setIsExportingPng(true);
+    try {
+      await exportSvgAsPng(mapSvgElementRef.current);
+    } catch (exportFailure) {
+      setExportError(exportFailure instanceof Error ? exportFailure.message : 'PNG export failed.');
+    } finally {
+      setIsExportingPng(false);
+    }
+  }
+
   return (
     <div className="app-shell" style={{ backgroundColor: COLORS.pageBackground }}>
       <header className="app-header">
@@ -266,6 +287,12 @@ function App() {
             <p className="muted">
               Auto on at zoom k &gt;= {MUNICIPALITY_LABEL_ZOOM_THRESHOLD.toFixed(1)}. Current k={transform.k.toFixed(2)}.
             </p>
+            <div className="button-stack">
+              <button disabled={!canUseMapControls || isExportingPng} onClick={() => void handleExportPng()} type="button">
+                {isExportingPng ? 'Exporting PNG...' : 'Export PNG'}
+              </button>
+            </div>
+            {exportError ? <p className="error">{exportError}</p> : null}
           </section>
 
           <section className="sidebar-section">
@@ -313,6 +340,7 @@ function App() {
                 onTransformChange={setTransform}
                 selectedId={selectedId}
                 showMunicipalityLabels={showMunicipalityLabels}
+                svgElementRef={mapSvgElementRef}
                 transform={transform}
                 visitedIds={visitedIds}
               />

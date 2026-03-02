@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/constants.ts","./src/main.tsx","./src/vite-env.d.ts","./src/components/njmap.tsx","./src/lib/mapgeometry.ts","./src/lib/maptransform.ts","./src/lib/storage.ts","./src/types/data.ts","./src/types/state.ts","./src/types/ui.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/constants.ts","./src/main.tsx","./src/vite-env.d.ts","./src/components/njmap.tsx","./src/lib/exportpng.ts","./src/lib/mapgeometry.ts","./src/lib/maptransform.ts","./src/lib/storage.ts","./src/types/data.ts","./src/types/state.ts","./src/types/ui.ts"],"version":"5.9.3"}

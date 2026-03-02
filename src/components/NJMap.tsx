@@ -1,6 +1,6 @@
 import type { Geometry } from 'geojson';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction, WheelEvent as ReactWheelEvent } from 'react';
+import type { Dispatch, MouseEvent as ReactMouseEvent, MutableRefObject, SetStateAction, WheelEvent as ReactWheelEvent } from 'react';
 import { COLORS, MAP_VIEWBOX } from '../constants';
 import {
   buildProjector,
@@ -20,6 +20,7 @@ interface NJMapProps {
   selectedId: string | null;
   transform: MapTransform;
   showMunicipalityLabels: boolean;
+  svgElementRef?: MutableRefObject<SVGSVGElement | null>;
   onTransformChange: Dispatch<SetStateAction<MapTransform>>;
   onMunicipalityClick: (municipalityId: string) => void;
   onMunicipalityHover: (tooltip: MunicipalityHoverTooltip | null) => void;
@@ -32,6 +33,7 @@ export default function NJMap({
   selectedId,
   transform,
   showMunicipalityLabels,
+  svgElementRef,
   onTransformChange,
   onMunicipalityClick,
   onMunicipalityHover,
@@ -163,7 +165,12 @@ export default function NJMap({
       onMouseDown={handleMouseDown}
       onMouseLeave={() => onMunicipalityHover(null)}
       onWheel={handleWheel}
-      ref={svgRef}
+      ref={(element) => {
+        svgRef.current = element;
+        if (svgElementRef) {
+          svgElementRef.current = element;
+        }
+      }}
       viewBox={`0 0 ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
       role="img"
     >
