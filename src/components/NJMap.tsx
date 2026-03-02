@@ -13,6 +13,7 @@ interface NJMapProps {
   selectedId: string | null;
   transform: MapTransform;
   onTransformChange: Dispatch<SetStateAction<MapTransform>>;
+  onMunicipalityClick: (municipalityId: string) => void;
 }
 
 interface Bounds {
@@ -114,6 +115,7 @@ export default function NJMap({
   selectedId,
   transform,
   onTransformChange,
+  onMunicipalityClick,
 }: NJMapProps) {
   const bounds = useMemo(
     () => computeGeometryBounds(counties.map((county) => county.geometry)),
@@ -122,6 +124,7 @@ export default function NJMap({
   const project = useMemo(() => buildProjector(bounds), [bounds]);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const isDraggingRef = useRef(false);
+  const dragMovedRef = useRef(false);
   const lastDragPointRef = useRef<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -142,6 +145,10 @@ export default function NJMap({
 
       const dx = (dxPixels * MAP_VIEWBOX.width) / rect.width;
       const dy = (dyPixels * MAP_VIEWBOX.height) / rect.height;
+
+      if (Math.abs(dxPixels) > 2 || Math.abs(dyPixels) > 2) {
+        dragMovedRef.current = true;
+      }
 
       onTransformChange((previous) => normalizeTransform({ ...previous, x: previous.x + dx, y: previous.y + dy }));
     }
@@ -195,6 +202,7 @@ export default function NJMap({
 
     event.preventDefault();
     isDraggingRef.current = true;
+    dragMovedRef.current = false;
     lastDragPointRef.current = { x: event.clientX, y: event.clientY };
     setIsDragging(true);
   }
@@ -221,8 +229,15 @@ export default function NJMap({
             return (
               <path
                 key={id}
+                className="municipality-path"
                 d={geometryToPath(municipality.geometry, project)}
                 fill={visitedIds.has(id) ? COLORS.visitedFill : COLORS.municipalFill}
+                onClick={() => {
+                  if (dragMovedRef.current) {
+                    return;
+                  }
+                  onMunicipalityClick(id);
+                }}
                 stroke={COLORS.municipalStroke}
                 strokeWidth={0.9}
                 vectorEffect="non-scaling-stroke"

@@ -60,6 +60,18 @@ function App() {
   const municipalityCount = data?.meta.municipalityCount ?? 0;
   const countyCount = data?.meta.countyCount ?? 0;
   const canUseMapControls = Boolean(data) && !error;
+  function handleMunicipalityClick(municipalityId: string): void {
+    setSelectedId(municipalityId);
+    setVisitedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(municipalityId)) {
+        next.delete(municipalityId);
+      } else {
+        next.add(municipalityId);
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="app-shell" style={{ backgroundColor: COLORS.pageBackground }}>
@@ -151,6 +163,7 @@ function App() {
             <NJMap
               counties={data.counties}
               municipalities={data.municipalities}
+              onMunicipalityClick={handleMunicipalityClick}
               onTransformChange={setTransform}
               selectedId={selectedId}
               transform={transform}

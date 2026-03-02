@@ -130,6 +130,10 @@ input {
   cursor: grabbing;
 }
 
+.municipality-path {
+  cursor: pointer;
+}
+
 .county-label {
   font-size: 12px;
   font-weight: 700;
