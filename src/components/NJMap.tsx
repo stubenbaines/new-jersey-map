@@ -1,10 +1,16 @@
-import type { Geometry, Position } from 'geojson';
+import type { Geometry } from 'geojson';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, MouseEvent as ReactMouseEvent, SetStateAction, WheelEvent as ReactWheelEvent } from 'react';
 import { COLORS, MAP_VIEWBOX } from '../constants';
-import type { CountyRecord, MunicipalityRecord } from '../types/data';
+import {
+  buildProjector,
+  computeGeometryBounds,
+  geometryToPath,
+} from '../lib/mapGeometry';
 import { normalizeTransform, zoomAtPoint } from '../lib/mapTransform';
+import type { CountyRecord, MunicipalityRecord } from '../types/data';
 import type { MapTransform } from '../types/state';
+import type { MunicipalityHoverTooltip } from '../types/ui';
 
 interface NJMapProps {
   municipalities: MunicipalityRecord[];
@@ -14,98 +20,7 @@ interface NJMapProps {
   transform: MapTransform;
   onTransformChange: Dispatch<SetStateAction<MapTransform>>;
   onMunicipalityClick: (municipalityId: string) => void;
-}
-
-interface Bounds {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-}
-
-function updateBounds(bounds: Bounds, position: Position): void {
-  const x = Number(position[0]);
-  const y = Number(position[1]);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return;
-  }
-
-  bounds.minX = Math.min(bounds.minX, x);
-  bounds.maxX = Math.max(bounds.maxX, x);
-  bounds.minY = Math.min(bounds.minY, y);
-  bounds.maxY = Math.max(bounds.maxY, y);
-}
-
-function geometryToRings(geometry: Geometry): Position[][] {
-  if (geometry.type === 'Polygon') {
-    return geometry.coordinates;
-  }
-  if (geometry.type === 'MultiPolygon') {
-    return geometry.coordinates.flat();
-  }
-  return [];
-}
-
-function computeGeometryBounds(geometries: Geometry[]): Bounds {
-  const bounds: Bounds = {
-    minX: Number.POSITIVE_INFINITY,
-    minY: Number.POSITIVE_INFINITY,
-    maxX: Number.NEGATIVE_INFINITY,
-    maxY: Number.NEGATIVE_INFINITY,
-  };
-
-  geometries.forEach((geometry) => {
-    geometryToRings(geometry).forEach((ring) => {
-      ring.forEach((position) => updateBounds(bounds, position));
-    });
-  });
-
-  if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.minY)) {
-    return { minX: -75.6, minY: 38.9, maxX: -73.9, maxY: 41.4 };
-  }
-
-  return bounds;
-}
-
-function buildProjector(bounds: Bounds) {
-  const drawableWidth = MAP_VIEWBOX.width - MAP_VIEWBOX.padding * 2;
-  const drawableHeight = MAP_VIEWBOX.height - MAP_VIEWBOX.padding * 2;
-  const dataWidth = Math.max(bounds.maxX - bounds.minX, 1e-9);
-  const dataHeight = Math.max(bounds.maxY - bounds.minY, 1e-9);
-  const scale = Math.min(drawableWidth / dataWidth, drawableHeight / dataHeight);
-
-  const projectedWidth = dataWidth * scale;
-  const projectedHeight = dataHeight * scale;
-  const offsetX = MAP_VIEWBOX.padding + (drawableWidth - projectedWidth) / 2;
-  const offsetY = MAP_VIEWBOX.padding + (drawableHeight - projectedHeight) / 2;
-
-  return (position: Position): [number, number] => {
-    const x = offsetX + (Number(position[0]) - bounds.minX) * scale;
-    const y = offsetY + (bounds.maxY - Number(position[1])) * scale;
-    return [x, y];
-  };
-}
-
-function ringToPath(ring: Position[], project: (position: Position) => [number, number]): string {
-  if (ring.length === 0) {
-    return '';
-  }
-
-  const [startX, startY] = project(ring[0]);
-  let output = `M${startX.toFixed(2)},${startY.toFixed(2)}`;
-
-  for (let index = 1; index < ring.length; index += 1) {
-    const [x, y] = project(ring[index]);
-    output += `L${x.toFixed(2)},${y.toFixed(2)}`;
-  }
-
-  output += 'Z';
-  return output;
-}
-
-function geometryToPath(geometry: Geometry, project: (position: Position) => [number, number]): string {
-  const rings = geometryToRings(geometry);
-  return rings.map((ring) => ringToPath(ring, project)).join('');
+  onMunicipalityHover: (tooltip: MunicipalityHoverTooltip | null) => void;
 }
 
 export default function NJMap({
@@ -116,9 +31,10 @@ export default function NJMap({
   transform,
   onTransformChange,
   onMunicipalityClick,
+  onMunicipalityHover,
 }: NJMapProps) {
   const bounds = useMemo(
-    () => computeGeometryBounds(counties.map((county) => county.geometry)),
+    () => computeGeometryBounds(counties.map((county) => county.geometry as Geometry)),
     [counties],
   );
   const project = useMemo(() => buildProjector(bounds), [bounds]);
@@ -184,6 +100,23 @@ export default function NJMap({
     return { x, y };
   }
 
+  function emitHover(
+    event: ReactMouseEvent<SVGPathElement>,
+    municipalityName: string,
+    countyName: string,
+  ): void {
+    if (!svgRef.current || isDraggingRef.current) {
+      return;
+    }
+
+    const rect = svgRef.current.getBoundingClientRect();
+    onMunicipalityHover({
+      x: event.clientX - rect.left + 12,
+      y: event.clientY - rect.top + 14,
+      text: `${municipalityName}, ${countyName}`,
+    });
+  }
+
   function handleWheel(event: ReactWheelEvent<SVGSVGElement>): void {
     event.preventDefault();
     const point = toViewBoxPoint(event.clientX, event.clientY);
@@ -212,6 +145,7 @@ export default function NJMap({
       aria-label="New Jersey municipality map"
       className={`map-svg ${isDragging ? 'is-dragging' : ''}`}
       onMouseDown={handleMouseDown}
+      onMouseLeave={() => onMunicipalityHover(null)}
       onWheel={handleWheel}
       ref={svgRef}
       viewBox={`0 0 ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
@@ -219,7 +153,6 @@ export default function NJMap({
     >
       <rect fill={COLORS.mapBackground} height={MAP_VIEWBOX.height} width={MAP_VIEWBOX.width} x={0} y={0} />
       <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.k})`}>
-
         <g aria-label="Municipalities" className="municipality-layer">
           {municipalities.map((municipality) => {
             const id = municipality.id;
@@ -230,7 +163,7 @@ export default function NJMap({
               <path
                 key={id}
                 className="municipality-path"
-                d={geometryToPath(municipality.geometry, project)}
+                d={geometryToPath(municipality.geometry as Geometry, project)}
                 fill={visitedIds.has(id) ? COLORS.visitedFill : COLORS.municipalFill}
                 onClick={() => {
                   if (dragMovedRef.current) {
@@ -238,12 +171,13 @@ export default function NJMap({
                   }
                   onMunicipalityClick(id);
                 }}
+                onMouseEnter={(event) => emitHover(event, name, county)}
+                onMouseMove={(event) => emitHover(event, name, county)}
+                onMouseOut={() => onMunicipalityHover(null)}
                 stroke={COLORS.municipalStroke}
                 strokeWidth={0.9}
                 vectorEffect="non-scaling-stroke"
-              >
-                <title>{`${name}, ${county}`}</title>
-              </path>
+              />
             );
           })}
         </g>
@@ -254,7 +188,7 @@ export default function NJMap({
             return (
               <path
                 key={id}
-                d={geometryToPath(county.geometry, project)}
+                d={geometryToPath(county.geometry as Geometry, project)}
                 fill="none"
                 stroke={COLORS.countyStroke}
                 strokeWidth={1.8}
@@ -271,7 +205,7 @@ export default function NJMap({
               .map((municipality) => (
                 <path
                   key={`selected-${selectedId}`}
-                  d={geometryToPath(municipality.geometry, project)}
+                  d={geometryToPath(municipality.geometry as Geometry, project)}
                   fill="none"
                   stroke={COLORS.selectedStroke}
                   strokeWidth={2.4}

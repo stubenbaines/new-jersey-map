@@ -1,16 +1,39 @@
+import type { Geometry } from 'geojson';
 import { useEffect, useMemo, useState } from 'react';
 import NJMap from './components/NJMap';
-import { COLORS } from './constants';
+import { COLORS, MAP_VIEWBOX } from './constants';
+import {
+  buildProjector,
+  computeGeometryBounds,
+  computeGeometryCenter,
+} from './lib/mapGeometry';
 import { ZOOM_BUTTON_FACTOR, zoomAtViewportCenter } from './lib/mapTransform';
 import { loadPersistedState, savePersistedState } from './lib/storage';
 import type { NJGeometryData } from './types/data';
 import { DEFAULT_MAP_TRANSFORM } from './types/state';
 import type { MapTransform } from './types/state';
+import type { MunicipalityHoverTooltip } from './types/ui';
+
+interface SearchResultItem {
+  id: string;
+  label: string;
+  searchText: string;
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
 
 function App() {
   const [data, setData] = useState<NJGeometryData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeResultIndex, setActiveResultIndex] = useState<number>(-1);
+  const [hoverTooltip, setHoverTooltip] = useState<MunicipalityHoverTooltip | null>(null);
 
   const persisted = useMemo(() => loadPersistedState(), []);
   const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set(persisted.visitedIds));
@@ -60,7 +83,52 @@ function App() {
   const municipalityCount = data?.meta.municipalityCount ?? 0;
   const countyCount = data?.meta.countyCount ?? 0;
   const canUseMapControls = Boolean(data) && !error;
-  function handleMunicipalityClick(municipalityId: string): void {
+
+  const searchIndex = useMemo<SearchResultItem[]>(() => {
+    if (!data) {
+      return [];
+    }
+
+    return data.municipalities.map((municipality) => {
+      const label = `${municipality.name}, ${municipality.county}`;
+      return {
+        id: municipality.id,
+        label,
+        searchText: normalizeSearchText(`${municipality.name} ${municipality.county}`),
+      };
+    });
+  }, [data]);
+
+  const searchQueryNormalized = normalizeSearchText(searchQuery);
+  const searchResults = useMemo(() => {
+    if (!searchQueryNormalized) {
+      return [];
+    }
+
+    return searchIndex.filter((item) => item.searchText.includes(searchQueryNormalized)).slice(0, 15);
+  }, [searchIndex, searchQueryNormalized]);
+
+  useEffect(() => {
+    setActiveResultIndex(searchResults.length > 0 ? 0 : -1);
+  }, [searchQuery, searchResults.length]);
+
+  const municipalitiesById = useMemo(() => {
+    const nextMap = new Map<string, NJGeometryData['municipalities'][number]>();
+    data?.municipalities.forEach((municipality) => {
+      nextMap.set(municipality.id, municipality);
+    });
+    return nextMap;
+  }, [data]);
+
+  const projectForCentering = useMemo(() => {
+    if (!data) {
+      return null;
+    }
+    const bounds = computeGeometryBounds(data.counties.map((county) => county.geometry as Geometry));
+    return buildProjector(bounds);
+  }, [data]);
+
+  function toggleMunicipalityVisited(municipalityId: string): void {
     setSelectedId(municipalityId);
     setVisitedIds((previous) => {
       const next = new Set(previous);
@@ -70,6 +138,33 @@ function App() {
         next.add(municipalityId);
       }
       return next;
+    });
+  }
+
+  function handleMunicipalityClick(municipalityId: string): void {
+    toggleMunicipalityVisited(municipalityId);
+  }
+
+  function handleSearchSelect(municipalityId: string): void {
+    toggleMunicipalityVisited(municipalityId);
+    setSearchQuery('');
+    setActiveResultIndex(-1);
+
+    const municipality = municipalitiesById.get(municipalityId);
+    if (!municipality || !projectForCentering) {
+      return;
+    }
+
+    const centerCoordinate = computeGeometryCenter(municipality.geometry as Geometry);
+    const projectedCenter = projectForCentering(centerCoordinate);
+
+    setTransform((previous) => {
+      const k = previous.k < 2 ? 2 : previous.k;
+      return {
+        x: MAP_VIEWBOX.width / 2 - projectedCenter[0] * k,
+        y: MAP_VIEWBOX.height / 2 - projectedCenter[1] * k,
+        k,
+      };
     });
   }
 
@@ -83,8 +178,58 @@ function App() {
         <aside className="sidebar" style={{ backgroundColor: COLORS.panelBackground }}>
           <section className="sidebar-section">
             <h2>Search</h2>
-            <input disabled placeholder="Municipality, County" type="text" />
-            <p className="muted">Milestone 4 placeholder</p>
+            <input
+              disabled={!data || Boolean(error)}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  if (searchResults.length > 0) {
+                    setActiveResultIndex((previous) => (previous + 1) % searchResults.length);
+                  }
+                }
+
+                if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  if (searchResults.length > 0) {
+                    setActiveResultIndex((previous) =>
+                      previous <= 0 ? searchResults.length - 1 : previous - 1,
+                    );
+                  }
+                }
+
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  if (searchResults.length > 0) {
+                    const result = searchResults[activeResultIndex >= 0 ? activeResultIndex : 0];
+                    handleSearchSelect(result.id);
+                  }
+                }
+
+                if (event.key === 'Escape') {
+                  setSearchQuery('');
+                  setActiveResultIndex(-1);
+                }
+              }}
+              placeholder="Municipality, County"
+              type="text"
+              value={searchQuery}
+            />
+            {searchResults.length > 0 ? (
+              <ul aria-label="Search results" className="search-results-list">
+                {searchResults.map((result, index) => (
+                  <li key={result.id}>
+                    <button
+                      className={`search-result-button ${index === activeResultIndex ? 'is-active' : ''}`}
+                      onClick={() => handleSearchSelect(result.id)}
+                      type="button"
+                    >
+                      {result.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </section>
 
           <section className="sidebar-section">
@@ -131,16 +276,7 @@ function App() {
                     return;
                   }
                   const randomMunicipality = data.municipalities[Math.floor(Math.random() * data.municipalities.length)];
-                  setSelectedId(randomMunicipality.id);
-                  setVisitedIds((previous) => {
-                    const next = new Set(previous);
-                    if (next.has(randomMunicipality.id)) {
-                      next.delete(randomMunicipality.id);
-                    } else {
-                      next.add(randomMunicipality.id);
-                    }
-                    return next;
-                  });
+                  toggleMunicipalityVisited(randomMunicipality.id);
                 }}
                 type="button"
               >
@@ -160,15 +296,27 @@ function App() {
           {error ? <p className="error">Failed to load map data: {error}</p> : null}
           {!data && !error ? <p className="muted">Loading geometry data...</p> : null}
           {data ? (
-            <NJMap
-              counties={data.counties}
-              municipalities={data.municipalities}
-              onMunicipalityClick={handleMunicipalityClick}
-              onTransformChange={setTransform}
-              selectedId={selectedId}
-              transform={transform}
-              visitedIds={visitedIds}
-            />
+            <>
+              <NJMap
+                counties={data.counties}
+                municipalities={data.municipalities}
+                onMunicipalityClick={handleMunicipalityClick}
+                onMunicipalityHover={setHoverTooltip}
+                onTransformChange={setTransform}
+                selectedId={selectedId}
+                transform={transform}
+                visitedIds={visitedIds}
+              />
+              {hoverTooltip ? (
+                <div
+                  aria-live="polite"
+                  className="map-tooltip"
+                  style={{ left: `${hoverTooltip.x}px`, top: `${hoverTooltip.y}px` }}
+                >
+                  {hoverTooltip.text}
+                </div>
+              ) : null}
+            </>
           ) : null}
         </section>
       </main>

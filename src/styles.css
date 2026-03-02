@@ -78,6 +78,30 @@ input {
   padding-left: 18px;
 }
 
+.search-results-list {
+  list-style: none;
+  margin: 8px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0;
+}
+
+.search-result-button {
+  background: #ffffff;
+  border: 1px solid #cfcfcf;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 4px;
+  padding: 6px 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.search-result-button.is-active {
+  background: #ececec;
+  border-color: #7d7d7d;
+}
+
 .button-stack {
   display: grid;
   gap: 8px;
@@ -113,6 +137,7 @@ input {
   display: flex;
   justify-content: center;
   overflow: auto;
+  position: relative;
 }
 
 .map-svg {
@@ -132,6 +157,19 @@ input {
 
 .municipality-path {
   cursor: pointer;
+}
+
+.map-tooltip {
+  background: rgba(23, 23, 23, 0.92);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.8rem;
+  max-width: 260px;
+  padding: 4px 7px;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+  z-index: 4;
 }
 
 .county-label {
