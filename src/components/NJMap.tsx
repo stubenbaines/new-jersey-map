@@ -5,6 +5,7 @@ import { COLORS, MAP_VIEWBOX } from '../constants';
 import {
   buildProjector,
   computeGeometryBounds,
+  computeGeometryCenter,
   geometryToPath,
 } from '../lib/mapGeometry';
 import { normalizeTransform, zoomAtPoint } from '../lib/mapTransform';
@@ -18,6 +19,7 @@ interface NJMapProps {
   visitedIds: Set<string>;
   selectedId: string | null;
   transform: MapTransform;
+  showMunicipalityLabels: boolean;
   onTransformChange: Dispatch<SetStateAction<MapTransform>>;
   onMunicipalityClick: (municipalityId: string) => void;
   onMunicipalityHover: (tooltip: MunicipalityHoverTooltip | null) => void;
@@ -29,6 +31,7 @@ export default function NJMap({
   visitedIds,
   selectedId,
   transform,
+  showMunicipalityLabels,
   onTransformChange,
   onMunicipalityClick,
   onMunicipalityHover,
@@ -38,6 +41,19 @@ export default function NJMap({
     [counties],
   );
   const project = useMemo(() => buildProjector(bounds), [bounds]);
+  const municipalityLabelPoints = useMemo(
+    () =>
+      municipalities.map((municipality) => {
+        const projected = project(computeGeometryCenter(municipality.geometry as Geometry));
+        return {
+          id: municipality.id,
+          name: municipality.name,
+          x: projected[0],
+          y: projected[1],
+        };
+      }),
+    [municipalities, project],
+  );
   const svgRef = useRef<SVGSVGElement | null>(null);
   const isDraggingRef = useRef(false);
   const dragMovedRef = useRef(false);
@@ -212,6 +228,22 @@ export default function NJMap({
                   vectorEffect="non-scaling-stroke"
                 />
               ))}
+          </g>
+        ) : null}
+
+        {showMunicipalityLabels ? (
+          <g aria-label="Municipality labels" className="municipality-label-layer">
+            {municipalityLabelPoints.map((labelPoint) => (
+              <text
+                key={`muni-label-${labelPoint.id}`}
+                className="municipality-label"
+                fill={COLORS.municipalityLabel}
+                x={labelPoint.x}
+                y={labelPoint.y}
+              >
+                {labelPoint.name}
+              </text>
+            ))}
           </g>
         ) : null}
 

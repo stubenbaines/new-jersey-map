@@ -1,7 +1,7 @@
 import type { Geometry } from 'geojson';
 import { useEffect, useMemo, useState } from 'react';
 import NJMap from './components/NJMap';
-import { COLORS, MAP_VIEWBOX } from './constants';
+import { COLORS, MAP_VIEWBOX, MUNICIPALITY_LABEL_ZOOM_THRESHOLD } from './constants';
 import {
   buildProjector,
   computeGeometryBounds,
@@ -83,6 +83,8 @@ function App() {
   const municipalityCount = data?.meta.municipalityCount ?? 0;
   const countyCount = data?.meta.countyCount ?? 0;
   const canUseMapControls = Boolean(data) && !error;
+  const isMunicipalityLabelsAutoVisible = transform.k >= MUNICIPALITY_LABEL_ZOOM_THRESHOLD;
+  const showMunicipalityLabels = showMunicipalityLabelsOverride || isMunicipalityLabelsAutoVisible;
 
   const searchIndex = useMemo<SearchResultItem[]>(() => {
     if (!data) {
@@ -253,6 +255,17 @@ function App() {
                 Reset View
               </button>
             </div>
+            <label className="toggle-control">
+              <input
+                checked={showMunicipalityLabelsOverride}
+                onChange={(event) => setShowMunicipalityLabelsOverride(event.target.checked)}
+                type="checkbox"
+              />
+              <span>Show municipality labels</span>
+            </label>
+            <p className="muted">
+              Auto on at zoom k &gt;= {MUNICIPALITY_LABEL_ZOOM_THRESHOLD.toFixed(1)}. Current k={transform.k.toFixed(2)}.
+            </p>
           </section>
 
           <section className="sidebar-section">
@@ -263,7 +276,8 @@ function App() {
               <li>Visited IDs: {visitedIds.size}</li>
               <li>Selected ID: {selectedId ?? 'none'}</li>
               <li>Transform: {`x=${transform.x.toFixed(1)}, y=${transform.y.toFixed(1)}, k=${transform.k.toFixed(2)}`}</li>
-              <li>Labels Override: {showMunicipalityLabelsOverride ? 'on' : 'off'}</li>
+              <li>Label Override: {showMunicipalityLabelsOverride ? 'on' : 'off'}</li>
+              <li>Municipality Labels Visible: {showMunicipalityLabels ? 'yes' : 'no'}</li>
             </ul>
           </section>
 
@@ -282,12 +296,6 @@ function App() {
               >
                 Toggle Random Municipality
               </button>
-              <button
-                onClick={() => setShowMunicipalityLabelsOverride((previous) => !previous)}
-                type="button"
-              >
-                Toggle Label Override Flag
-              </button>
             </div>
           </section>
         </aside>
@@ -304,6 +312,7 @@ function App() {
                 onMunicipalityHover={setHoverTooltip}
                 onTransformChange={setTransform}
                 selectedId={selectedId}
+                showMunicipalityLabels={showMunicipalityLabels}
                 transform={transform}
                 visitedIds={visitedIds}
               />
