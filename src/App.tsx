@@ -1,7 +1,7 @@
 import type { Geometry } from 'geojson';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import NJMap from './components/NJMap';
-import { COLORS, MAP_VIEWBOX, MUNICIPALITY_LABEL_ZOOM_THRESHOLD } from './constants';
+import { COLORS, MAP_VIEWBOX, MUNICIPALITY_LABEL_ZOOM_THRESHOLD, STORAGE_KEY } from './constants';
 import {
   buildProjector,
   computeGeometryBounds,
@@ -31,23 +31,27 @@ function normalizeSearchText(value: string): string {
 function App() {
   const [data, setData] = useState<NJGeometryData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dataLoadAttempt, setDataLoadAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeResultIndex, setActiveResultIndex] = useState<number>(-1);
   const [hoverTooltip, setHoverTooltip] = useState<MunicipalityHoverTooltip | null>(null);
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [storageSaveError, setStorageSaveError] = useState<string | null>(null);
 
   const persisted = useMemo(() => loadPersistedState(), []);
-  const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set(persisted.visitedIds));
+  const [storageLoadWarning, setStorageLoadWarning] = useState<string | null>(persisted.warning);
+  const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set(persisted.state.visitedIds));
   const [showMunicipalityLabelsOverride, setShowMunicipalityLabelsOverride] = useState<boolean>(
-    persisted.prefs.showMunicipalityLabelsOverride,
+    persisted.state.prefs.showMunicipalityLabelsOverride,
   );
-  const [transform, setTransform] = useState<MapTransform>(persisted.lastTransform);
+  const [transform, setTransform] = useState<MapTransform>(persisted.state.lastTransform);
   const mapSvgElementRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
     let isMounted = true;
+    setError(null);
 
     fetch('/data/nj-geometry.json')
       .then((response) => {
@@ -72,16 +76,17 @@ function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [dataLoadAttempt]);
 
   useEffect(() => {
-    savePersistedState({
+    const saveError = savePersistedState({
       visitedIds: [...visitedIds],
       prefs: {
         showMunicipalityLabelsOverride,
       },
       lastTransform: transform,
     });
+    setStorageSaveError(saveError);
   }, [showMunicipalityLabelsOverride, transform, visitedIds]);
 
   const municipalityCount = data?.meta.municipalityCount ?? 0;
@@ -191,6 +196,19 @@ function App() {
     }
   }
 
+  function clearSavedProgress(): void {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Keep UI state reset even if storage deletion fails.
+    }
+    setVisitedIds(new Set());
+    setShowMunicipalityLabelsOverride(false);
+    setTransform(DEFAULT_MAP_TRANSFORM);
+    setStorageLoadWarning(null);
+    setStorageSaveError(null);
+  }
+
   return (
     <div className="app-shell" style={{ backgroundColor: COLORS.pageBackground }}>
       <header className="app-header">
@@ -202,7 +220,13 @@ function App() {
           <section className="sidebar-section">
             <h2>Search</h2>
             <input
+              aria-activedescendant={activeResultIndex >= 0 ? `search-option-${activeResultIndex}` : undefined}
+              aria-autocomplete="list"
+              aria-controls="search-results-list"
+              aria-expanded={searchResults.length > 0}
+              aria-label="Search municipalities by municipality and county"
               disabled={!data || Boolean(error)}
+              role="combobox"
               onChange={(event) => setSearchQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'ArrowDown') {
@@ -239,12 +263,18 @@ function App() {
               value={searchQuery}
             />
             {searchResults.length > 0 ? (
-              <ul aria-label="Search results" className="search-results-list">
+              <ul
+                aria-label="Search results"
+                className="search-results-list"
+                id="search-results-list"
+                role="listbox"
+              >
                 {searchResults.map((result, index) => (
-                  <li key={result.id}>
+                  <li aria-selected={index === activeResultIndex} id={`search-option-${index}`} key={result.id} role="option">
                     <button
                       className={`search-result-button ${index === activeResultIndex ? 'is-active' : ''}`}
                       onClick={() => handleSearchSelect(result.id)}
+                      tabIndex={-1}
                       type="button"
                     >
                       {result.label}
@@ -293,6 +323,22 @@ function App() {
               </button>
             </div>
             {exportError ? <p className="error">{exportError}</p> : null}
+            {storageLoadWarning ? (
+              <div className="warning-box" role="alert">
+                <p>{storageLoadWarning}</p>
+                <button onClick={() => setStorageLoadWarning(null)} type="button">
+                  Dismiss
+                </button>
+              </div>
+            ) : null}
+            {storageSaveError ? (
+              <div className="warning-box" role="alert">
+                <p>{storageSaveError}</p>
+                <button onClick={clearSavedProgress} type="button">
+                  Reset Saved Data
+                </button>
+              </div>
+            ) : null}
           </section>
 
           <section className="sidebar-section">
@@ -328,7 +374,16 @@ function App() {
         </aside>
 
         <section className="map-panel" style={{ backgroundColor: COLORS.panelBackground }}>
-          {error ? <p className="error">Failed to load map data: {error}</p> : null}
+          {error ? (
+            <div className="warning-box" role="alert">
+              <p>Failed to load map data: {error}</p>
+              <div className="warning-actions">
+                <button onClick={() => setDataLoadAttempt((previous) => previous + 1)} type="button">
+                  Retry
+                </button>
+              </div>
+            </div>
+          ) : null}
           {!data && !error ? <p className="muted">Loading geometry data...</p> : null}
           {data ? (
             <>
