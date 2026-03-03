@@ -10,12 +10,7 @@ export const DEFAULT_MAP_TRANSFORM: MapTransform = {
   k: 1,
 };
 
-export interface AppPrefs {
-  showMunicipalityLabelsOverride: boolean;
-}
-
 export interface PersistedState {
   visitedIds: string[];
-  prefs: AppPrefs;
   lastTransform: MapTransform;
 }

@@ -5,9 +5,6 @@ import type { PersistedState } from '../types/state';
 
 const DEFAULT_STATE: PersistedState = {
   visitedIds: [],
-  prefs: {
-    showMunicipalityLabelsOverride: false,
-  },
   lastTransform: DEFAULT_MAP_TRANSFORM,
 };
 
@@ -41,9 +38,6 @@ export function loadPersistedState(): LoadedPersistedState {
         visitedIds: Array.isArray(parsed.visitedIds)
           ? parsed.visitedIds.filter((value): value is string => typeof value === 'string')
           : [],
-        prefs: {
-          showMunicipalityLabelsOverride: Boolean(parsed.prefs?.showMunicipalityLabelsOverride),
-        },
         lastTransform: normalizeTransform(parsed.lastTransform),
       },
       warning: null,

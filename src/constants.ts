@@ -6,8 +6,6 @@ export const MAP_VIEWBOX = {
   padding: 30,
 };
 
-export const MUNICIPALITY_LABEL_ZOOM_THRESHOLD = 2.5;
-
 export const COLORS = {
   pageBackground: '#f4f4f4',
   panelBackground: '#ffffff',
@@ -18,5 +16,4 @@ export const COLORS = {
   visitedFill: '#d12f2f',
   selectedStroke: '#111111',
   countyLabel: '#151515',
-  municipalityLabel: '#4b4b4b',
 };
