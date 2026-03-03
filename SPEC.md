@@ -8,9 +8,10 @@ The MVP includes:
 - Interactive NJ municipality + county map (vector only, no raster tiles).
 - Pan/zoom navigation with controls.
 - Click and search-based visited toggling.
-- Tooltip + label system suitable for dense geometry.
+- County labels + municipality hover tooltip.
 - Local persistence in `localStorage`.
 - PNG export of current view.
+- Import/export workflow for municipality visit lists.
 
 ## 3) Primary user stories
 - As a user, I can click municipalities to mark visited/unvisited quickly.
@@ -46,25 +47,64 @@ The MVP includes:
 
 ### FR-5 Labels and tooltip
 - County labels: always visible.
-- Municipality labels: hidden by default at low zoom.
-- Municipality labels auto-enable above threshold `k >= 2.5` (configurable constant).
-- UI toggle `Show municipality labels` forces municipality labels on.
 - Hover tooltip always available and shows `Municipality + County` (plus type if data has it).
+- Municipality on-map text labels are out of scope and disabled for now.
 
 ### FR-6 Persistence
 - Persist visited IDs in `localStorage`.
-- Persist UI preferences in `localStorage`:
-  - label toggle override
-  - last map transform (`x`, `y`, `k`) as part of MVP
+- Persist last map transform (`x`, `y`, `k`) in `localStorage` as part of MVP.
 - Data key is versioned to allow future schema upgrades.
 
 ### FR-7 Export PNG
 - `Export PNG` captures current viewport state, including:
   - current pan/zoom transform
   - visited fills
-  - currently visible labels
+  - currently visible county labels
   - selected outline (if present)
 - Download file name format: `nj-visits-YYYY-MM-DD.png`.
+
+### FR-8 Import visited list
+- Provide a text-area based import workflow in MVP (file upload is optional and not required).
+- Accepted input format:
+  - one location per line
+  - each line is either comma-delimited or tab-delimited
+  - expected fields: `Municipality, County`
+- Parser behavior:
+  - trim whitespace
+  - case-insensitive matching against canonical municipality + county
+  - ignore blank lines
+- On apply:
+  - matching rows set those municipalities to visited
+  - map selection can remain unchanged
+  - duplicates are de-duplicated
+- Non-matching rows are captured and shown in UX as import errors; they do not break import.
+
+### FR-9 Export visited list
+- Provide an export action for the visited set using text/CSV output.
+- Output format:
+  - one line per visited municipality
+  - `Municipality, County`
+  - alphabetically sorted
+  - grouped by county (county blocks in county-name order, municipalities sorted within each county)
+- Export reflects current app state at time of export.
+
+### FR-10 Reset progress
+- Provide a reset action to:
+  - clear visited municipalities
+  - clear persisted local state (`localStorage` app key)
+  - reset map transform to full-state fit
+- Include a confirmation step to avoid accidental data loss.
+
+### FR-11 Map aspect ratio QA (low priority)
+- Validate projection/viewport configuration so NJ does not look vertically squished.
+- If distortion is present, correct projection fit/viewport sizing while preserving interaction behavior.
+
+### FR-12 Desktop app feasibility spike
+- Evaluate packaging the web app as a standalone Windows desktop app.
+- Compare at least:
+  - Electron
+  - Tauri
+- Deliverable is a recommendation doc with tradeoffs, not a required MVP implementation.
 
 ## 5) Data requirements
 - Source authoritative NJ municipality and county boundaries from New Jersey state-provided downloads.
@@ -84,9 +124,9 @@ Expected raw data drop location:
 ## 6) Local data model (app state)
 - `visitedIds: Set<string>`
 - `selectedId: string | null`
-- `showMunicipalityLabelsOverride: boolean`
 - `zoomK: number`
 - `transform: { x: number, y: number, k: number }`
+- `lastImportReport: { importedCount: number, unmatched: string[] } | null` (optional persisted or session-only)
 
 `localStorage` proposal:
 - key: `nj-visits:v1`
@@ -94,9 +134,6 @@ Expected raw data drop location:
 ```json
 {
   "visitedIds": ["..."],
-  "prefs": {
-    "showMunicipalityLabelsOverride": false
-  },
   "lastTransform": {
     "x": 0,
     "y": 0,
@@ -132,7 +169,7 @@ Color guidance:
 ## 10) Non-goals (MVP)
 - No accounts, backend, or cloud sync.
 - No mobile-first design.
-- No full label collision-avoidance engine.
+- No municipality on-map text labels.
 - No historical timeline or trip journaling features.
 
 ## 11) Resolved pre-implementation decisions
@@ -140,42 +177,3 @@ Color guidance:
 - Intake format will be GeoJSON.
 - Last map transform persistence is included in MVP.
 - Base palette is black/white map with red visited fill, aligned with reference images in `samples/`.
-
-## 12) Milestone 8 — Label UX refinement (post-MVP)
-Goal:
-- Improve municipality label readability in dense areas (for example Camden County) while preserving current interaction/performance behavior.
-
-### M8-L1 Label text normalization (display only)
-- Normalize municipality label text before rendering:
-  - Remove trailing `Borough`.
-  - Replace trailing `Township` with `TWP`.
-- Keep canonical municipality names unchanged in search, tooltip, and data storage.
-
-### M8-L2 Compact label rendering
-- Reduce municipality label font size slightly from current baseline.
-- Support two-line wrapped labels using SVG text (`tspan`) where useful.
-- Prefer line breaks at spaces and avoid three-or-more-line label blocks.
-
-### M8-L3 Border-aware label placement
-- Detect municipalities that touch or are near the NJ outer state boundary.
-- Place their labels near the municipality edge so most of the label sits outside the dense map interior.
-- Use side-aware alignment (`text-anchor` and offsets) so labels remain readable and visually connected.
-- Example targets: Atlantic City, Wildwood.
-
-### M8-L4 Density controls
-- Add zoom-tiered municipality label density:
-  - At lower label zoom, show a reduced subset in dense areas.
-  - At higher zoom, allow fuller label coverage.
-- Add lightweight collision suppression (grid or bbox overlap filtering) for municipality labels.
-- Do not implement a full force/collision simulation engine.
-
-### M8-L5 County hot-spot tuning
-- Allow small per-county or per-municipality positional overrides for known dense regions (Camden, Hudson, Essex).
-- Keep overrides minimal and documented.
-
-### Milestone 8 acceptance criteria
-- Camden County is visibly more readable than current label behavior at default municipality-label zoom.
-- `Borough` is removed and `Township` is abbreviated to `TWP` in municipality labels.
-- Border municipalities can render labels with outward placement behavior.
-- Search/tooltip/export correctness remains intact and uses canonical names.
-- Pan/zoom remains smooth with labels enabled and no severe regression in interaction responsiveness.

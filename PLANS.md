@@ -13,7 +13,7 @@ Exit criteria:
 - App scaffold committed and runs locally.
 - Base layout exists: header, sidebar, map panel.
 - Shared constants file created for visual tokens and thresholds.
-- Basic state model established (`visitedIds`, `selectedId`, `transform`, label prefs).
+- Basic state model established (`visitedIds`, `selectedId`, `transform`).
 
 Verification:
 - `npm run dev` starts app and renders scaffold with placeholder map region.
@@ -83,20 +83,18 @@ Verification:
 - Manual checks for duplicate municipality names across counties.
 - Validate selection behavior from both click and search paths.
 
-## Milestone 5 — Label gating and UI toggle
+## Milestone 5 — County labels + tooltip UX
 Tasks:
 - Keep county labels always visible.
-- Gate municipality labels by zoom threshold constant.
-- Add `Show municipality labels` override toggle.
+- Keep municipality hover tooltip behavior stable and readable.
 
 Exit criteria:
-- Municipality labels appear automatically above threshold.
-- Override toggle forces labels on below threshold.
-- No severe rendering slowdown at statewide view.
+- County labels remain visible across interactions.
+- Tooltip appears reliably on hover and does not regress click/search workflows.
 
 Verification:
-- Manual threshold checks near boundary values (just below/above `k`).
-- Performance sanity check during pan at full label visibility.
+- Manual hover checks in dense and sparse areas.
+- Performance sanity check during pan/zoom with county labels shown.
 
 ## Milestone 6 — PNG export (current viewport)
 Tasks:
@@ -130,46 +128,73 @@ Verification:
   - search and navigate
   - export PNG
 
-## Milestone 8 — Label UX refinement
+## Milestone 8 — Import/export list workflow + reset
 Tasks:
-- Implement municipality label text normalization for display-only labels:
-  - remove trailing `Borough`
-  - replace trailing `Township` with `TWP`
-- Add compact label formatting:
-  - reduce municipality label font size slightly
-  - allow two-line wrapping with SVG `tspan`
-  - avoid labels that require 3+ lines
-- Add border-aware placement:
-  - detect municipalities near the NJ outer border
-  - place labels with outward offsets and side-aware anchors
-- Add density management:
-  - introduce zoom-tiered municipality label density in dense regions
-  - add lightweight collision suppression (grid/bbox overlap filtering)
-- Add small documented hot-spot overrides for dense counties (Camden/Hudson/Essex).
+- Add text-area based import UI for visit list entries.
+- Parse per-line `Municipality, County` and tab-delimited equivalents.
+- Match rows case-insensitively against canonical municipality/county data.
+- Apply matched rows to visited set (deduped).
+- Capture unmatched rows and display them in the UI as import issues.
+- Add export action for current visited municipalities in `Municipality, County` lines.
+- Ensure export is grouped by county and alphabetically sorted.
+- Add reset action that clears visited state, clears persisted storage, and resets view.
+- Remove municipality on-map text labels from runtime behavior and related UI controls.
 
 Exit criteria:
-- Camden County is visibly more readable at default municipality-label zoom than Milestone 5 behavior.
-- `Borough` is removed and `Township` is abbreviated to `TWP` in municipality labels.
-- Border municipalities (for example Atlantic City, Wildwood) can render outward-facing labels.
-- Search, tooltip, visited state, and export behavior remain functionally correct.
-- No severe pan/zoom performance regression with municipality labels visible.
+- Import accepts valid lines and updates visited state accurately.
+- Unmatched rows are listed clearly and do not block successful matches.
+- Export output order is deterministic (county-grouped + alphabetical).
+- Reset reliably clears local state and returns full-state map view.
+- Search, tooltip, and county labels remain unchanged in behavior.
 
 Verification:
-- Manual visual comparisons before/after in dense regions (Camden, Hudson, Essex).
-- Manual checks for display-name normalization correctness on representative municipalities.
-- Manual checks that tooltip/search still use canonical municipality names.
-- Manual export comparison to confirm label rendering in PNG matches on-screen state.
-- Performance sanity check while panning at label-heavy zoom levels.
+- Manual import tests:
+  - valid rows only
+  - mixed valid/invalid rows (for example non-canonical places)
+  - duplicate entries
+  - tab-delimited entries
+- Manual export tests for sort/group order and line format.
+- Manual reset test verifying both UI and `localStorage` are cleared.
+
+## Milestone 9 — Map aspect ratio validation (low priority)
+Tasks:
+- Audit projection fit/scale and viewport dimensions for vertical distortion.
+- Compare rendered map proportions against trusted source geometry bounds.
+- Adjust fit logic if needed without regressing pan/zoom behavior.
+
+Exit criteria:
+- NJ map no longer appears vertically squished at default view.
+- Any projection/fit changes preserve interaction behavior and export output.
+
+Verification:
+- Before/after screenshot comparison at reset view.
+- Manual check of county and municipality boundary alignment after change.
+
+## Milestone 10 — Desktop packaging feasibility spike
+Tasks:
+- Evaluate Electron and Tauri packaging paths for a Windows-targeted standalone app.
+- Document setup complexity, bundle size/runtime footprint, update/distribution options, and maintenance overhead.
+- Recommend one path with rationale and a phased adoption plan.
+
+Exit criteria:
+- Written recommendation committed to repo.
+- Decision includes explicit tradeoffs and MVP impact.
+- No production packaging implementation required in this milestone.
+
+Verification:
+- Review recommendation doc for completeness and technical accuracy.
 
 ## Risk register
 - Data property instability:
   - Mitigation: lock stable source ID mapping and document it in pipeline script.
 - SVG export inconsistency across browsers:
   - Mitigation: test export implementation in all target browsers early (Milestone 6).
-- Label clutter/perf when forced on:
-  - Mitigation: keep simple font sizing rules and allow quick toggle off.
+- Import mismatch confusion:
+  - Mitigation: show unmatched rows with clear reasons and preserve successful imports.
+- Desktop packaging scope creep:
+  - Mitigation: keep Milestone 10 as recommendation-only spike.
 
 ## Definition of done (MVP)
-- All milestones 0-7 complete.
+- All milestones 0-8 complete.
 - Acceptance checks pass.
 - README documents setup + data regeneration + feature scope.
