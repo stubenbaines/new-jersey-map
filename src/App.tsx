@@ -21,11 +21,70 @@ interface SearchResultItem {
   searchText: string;
 }
 
+interface ParsedImportLine {
+  municipality: string;
+  county: string;
+}
+
+interface ImportIssue {
+  lineNumber: number;
+  raw: string;
+  reason: string;
+}
+
+interface ImportReport {
+  addedCount: number;
+  totalNonEmptyLines: number;
+  unmatched: ImportIssue[];
+}
+
 function normalizeSearchText(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+function createMunicipalityCountyKey(municipality: string, county: string): string {
+  return `${normalizeSearchText(municipality)}|${normalizeSearchText(county)}`;
+}
+
+function parseImportLine(rawLine: string): ParsedImportLine | null {
+  const line = rawLine.trim();
+  if (!line) {
+    return null;
+  }
+
+  if (line.includes('\t')) {
+    const parts = line.split('\t').map((value) => value.trim()).filter((value) => value.length > 0);
+    if (parts.length < 2) {
+      return null;
+    }
+    return {
+      municipality: parts[0],
+      county: parts[1],
+    };
+  }
+
+  const commaIndex = line.indexOf(',');
+  if (commaIndex === -1) {
+    return null;
+  }
+
+  const municipality = line.slice(0, commaIndex).trim();
+  const county = line.slice(commaIndex + 1).trim();
+  if (!municipality || !county) {
+    return null;
+  }
+
+  return {
+    municipality,
+    county,
+  };
+}
+
+function formatCurrentDateForFileName(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function App() {
@@ -38,6 +97,9 @@ function App() {
   const [hoverTooltip, setHoverTooltip] = useState<MunicipalityHoverTooltip | null>(null);
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [importInput, setImportInput] = useState('');
+  const [importReport, setImportReport] = useState<ImportReport | null>(null);
+  const [listExportError, setListExportError] = useState<string | null>(null);
   const [storageSaveError, setStorageSaveError] = useState<string | null>(null);
 
   const persisted = useMemo(() => loadPersistedState(), []);
@@ -123,6 +185,14 @@ function App() {
     return nextMap;
   }, [data]);
 
+  const municipalityKeyToId = useMemo(() => {
+    const nextMap = new Map<string, string>();
+    data?.municipalities.forEach((municipality) => {
+      nextMap.set(createMunicipalityCountyKey(municipality.name, municipality.county), municipality.id);
+    });
+    return nextMap;
+  }, [data]);
+
   const projectForCentering = useMemo(() => {
     if (!data) {
       return null;
@@ -188,16 +258,126 @@ function App() {
     }
   }
 
-  function clearSavedProgress(): void {
+  function resetProgressState(): void {
     try {
       window.localStorage.removeItem(STORAGE_KEY);
     } catch {
       // Keep UI state reset even if storage deletion fails.
     }
     setVisitedIds(new Set());
+    setSelectedId(null);
     setTransform(DEFAULT_MAP_TRANSFORM);
+    setImportReport(null);
     setStorageLoadWarning(null);
     setStorageSaveError(null);
+  }
+
+  function handleResetProgressWithConfirmation(): void {
+    const shouldReset = window.confirm(
+      'Reset all saved progress? This will clear visited municipalities and reset the map view.',
+    );
+    if (!shouldReset) {
+      return;
+    }
+    resetProgressState();
+  }
+
+  function handleImportApply(): void {
+    if (!data) {
+      return;
+    }
+
+    const lines = importInput.split(/\r?\n/);
+    const nextVisitedIds = new Set<string>(visitedIds);
+    const unmatched: ImportIssue[] = [];
+    let totalNonEmptyLines = 0;
+    let addedCount = 0;
+
+    lines.forEach((rawLine, index) => {
+      if (!rawLine.trim()) {
+        return;
+      }
+      totalNonEmptyLines += 1;
+
+      const parsedLine = parseImportLine(rawLine);
+      if (!parsedLine) {
+        unmatched.push({
+          lineNumber: index + 1,
+          raw: rawLine,
+          reason: 'Expected "Municipality, County" or tab-delimited fields.',
+        });
+        return;
+      }
+
+      const matchId = municipalityKeyToId.get(
+        createMunicipalityCountyKey(parsedLine.municipality, parsedLine.county),
+      );
+
+      if (!matchId) {
+        unmatched.push({
+          lineNumber: index + 1,
+          raw: rawLine,
+          reason: 'No NJ municipality match found.',
+        });
+        return;
+      }
+
+      if (!nextVisitedIds.has(matchId)) {
+        addedCount += 1;
+      }
+      nextVisitedIds.add(matchId);
+    });
+
+    setVisitedIds(nextVisitedIds);
+    setSelectedId(null);
+    setImportReport({
+      addedCount,
+      totalNonEmptyLines,
+      unmatched,
+    });
+    setListExportError(null);
+  }
+
+  function handleVisitedListExport(): void {
+    if (!data) {
+      return;
+    }
+
+    const visitedMunicipalities = data.municipalities
+      .filter((municipality) => visitedIds.has(municipality.id))
+      .sort((a, b) => {
+        const countyCompare = a.county.localeCompare(b.county);
+        if (countyCompare !== 0) {
+          return countyCompare;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+    const lines: string[] = [];
+    let currentCounty: string | null = null;
+    visitedMunicipalities.forEach((municipality) => {
+      if (currentCounty !== null && municipality.county !== currentCounty) {
+        lines.push('');
+      }
+      currentCounty = municipality.county;
+      lines.push(`${municipality.name}, ${municipality.county}`);
+    });
+    const output = lines.join('\n');
+
+    try {
+      const blob = new Blob([output], { type: 'text/csv;charset=utf-8' });
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `nj-visits-${formatCurrentDateForFileName()}.csv`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+      setListExportError(null);
+    } catch {
+      setListExportError('Visited list export failed.');
+    }
   }
 
   return (
@@ -301,8 +481,15 @@ function App() {
               <button disabled={!canUseMapControls || isExportingPng} onClick={() => void handleExportPng()} type="button">
                 {isExportingPng ? 'Exporting PNG...' : 'Export PNG'}
               </button>
+              <button disabled={!canUseMapControls} onClick={handleVisitedListExport} type="button">
+                Export Visited CSV
+              </button>
+              <button disabled={!canUseMapControls} onClick={handleResetProgressWithConfirmation} type="button">
+                Reset Progress
+              </button>
             </div>
             {exportError ? <p className="error">{exportError}</p> : null}
+            {listExportError ? <p className="error">{listExportError}</p> : null}
             {storageLoadWarning ? (
               <div className="warning-box" role="alert">
                 <p>{storageLoadWarning}</p>
@@ -314,9 +501,45 @@ function App() {
             {storageSaveError ? (
               <div className="warning-box" role="alert">
                 <p>{storageSaveError}</p>
-                <button onClick={clearSavedProgress} type="button">
+                <button onClick={resetProgressState} type="button">
                   Reset Saved Data
                 </button>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="sidebar-section">
+            <h2>Import Visited List</h2>
+            <textarea
+              aria-label="Import visited municipalities list"
+              className="import-textarea"
+              disabled={!canUseMapControls}
+              onChange={(event) => setImportInput(event.target.value)}
+              placeholder={'Saddle River, Bergen\nDunellen, Middlesex\nWest Trenton, Mercer'}
+              spellCheck={false}
+              value={importInput}
+            />
+            <div className="button-stack">
+              <button disabled={!canUseMapControls} onClick={handleImportApply} type="button">
+                Apply Import
+              </button>
+            </div>
+            {importReport ? (
+              <div className="import-report" role="status">
+                <p>
+                  Added {importReport.addedCount} municipalities from {importReport.totalNonEmptyLines} non-empty lines.
+                </p>
+                {importReport.unmatched.length > 0 ? (
+                  <ul className="import-unmatched-list">
+                    {importReport.unmatched.map((issue) => (
+                      <li key={`${issue.lineNumber}-${issue.raw}`}>
+                        Line {issue.lineNumber}: {issue.raw} ({issue.reason})
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">No unmatched lines.</p>
+                )}
               </div>
             ) : null}
           </section>

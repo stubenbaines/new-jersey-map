@@ -12,7 +12,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -70,6 +71,15 @@ input {
   border: 1px solid #ccc;
   border-radius: 4px;
   padding: 6px 8px;
+  width: 100%;
+}
+
+.import-textarea {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  min-height: 130px;
+  padding: 6px 8px;
+  resize: vertical;
   width: 100%;
 }
 
@@ -155,6 +165,21 @@ input {
   background: #fff;
   cursor: pointer;
   padding: 5px 8px;
+}
+
+.import-report {
+  margin-top: 8px;
+}
+
+.import-report p {
+  margin: 0 0 8px;
+}
+
+.import-unmatched-list {
+  margin: 0;
+  max-height: 140px;
+  overflow: auto;
+  padding-left: 18px;
 }
 
 .map-panel {
