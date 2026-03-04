@@ -53,9 +53,16 @@ export function computeGeometryBounds(geometries: Geometry[]): Bounds {
 }
 
 export function buildProjector(bounds: Bounds) {
+  const isLikelyGeographic =
+    bounds.minX >= -180 && bounds.maxX <= 180 && bounds.minY >= -90 && bounds.maxY <= 90;
+  const meanLatitude = (bounds.minY + bounds.maxY) / 2;
+  const longitudeScale = isLikelyGeographic ? Math.cos((meanLatitude * Math.PI) / 180) : 1;
+
   const drawableWidth = MAP_VIEWBOX.width - MAP_VIEWBOX.padding * 2;
   const drawableHeight = MAP_VIEWBOX.height - MAP_VIEWBOX.padding * 2;
-  const dataWidth = Math.max(bounds.maxX - bounds.minX, 1e-9);
+  const minProjectedX = bounds.minX * longitudeScale;
+  const maxProjectedX = bounds.maxX * longitudeScale;
+  const dataWidth = Math.max(maxProjectedX - minProjectedX, 1e-9);
   const dataHeight = Math.max(bounds.maxY - bounds.minY, 1e-9);
   const scale = Math.min(drawableWidth / dataWidth, drawableHeight / dataHeight);
 
@@ -65,7 +72,7 @@ export function buildProjector(bounds: Bounds) {
   const offsetY = MAP_VIEWBOX.padding + (drawableHeight - projectedHeight) / 2;
 
   return (position: Position): [number, number] => {
-    const x = offsetX + (Number(position[0]) - bounds.minX) * scale;
+    const x = offsetX + (Number(position[0]) * longitudeScale - minProjectedX) * scale;
     const y = offsetY + (bounds.maxY - Number(position[1])) * scale;
     return [x, y];
   };
