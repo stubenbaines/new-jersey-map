@@ -40,18 +40,44 @@ This writes:
 npm run build
 ```
 
-## Current Feature Scope (MVP through Milestone 7)
+## Tauri Desktop (Optional)
+Prerequisites:
+- Rust toolchain (`rustc`, `cargo`)
+- Tauri CLI:
+  ```bash
+  cargo install tauri-cli --locked
+  ```
+
+Run desktop app in dev mode:
+```bash
+npm run tauri:dev
+```
+
+Build Windows installer (NSIS) on a machine with Windows toolchain:
+```bash
+npm run tauri:build
+```
+
+## Current Feature Scope (MVP through Milestone 9)
 - Municipality + county map rendering
 - Pan/zoom controls and gestures
 - Click to toggle visited municipalities
 - localStorage persistence
 - Search with keyboard navigation
 - Hover tooltip
-- Municipality label gating + override toggle
+- County labels (municipality on-map labels removed)
 - PNG export of current map viewport
+- Text-area import of visited municipalities (`Municipality, County`, comma or tab-delimited)
+- CSV export of visited municipalities (county-grouped, alphabetical)
+- Reset progress action (clears local state + resets view)
 - Recovery UI for data load failures and storage parse/save failures
 
 ## Known Limitations
-- Municipality label placement is simple centroid-based rendering; no collision avoidance yet.
 - SVG-to-PNG export behavior is browser-dependent and should be validated across target browsers.
 - Desktop-first UX; mobile optimization is not yet a goal.
+
+## Desktop Packaging Spike
+- Recommendation and comparison for Electron vs Tauri:
+  - `docs/desktop-packaging-spike.md`
+- CI workflow for Windows installer builds:
+  - `.github/workflows/tauri-windows.yml`

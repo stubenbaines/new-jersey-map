@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "prepare:data": "python3 scripts/prepare_data.py"
+    "prepare:data": "python3 scripts/prepare_data.py",
+    "tauri:dev": "cargo tauri dev",
+    "tauri:build": "cargo tauri build --bundles nsis"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
