@@ -1,5 +1,5 @@
 import type { Geometry } from 'geojson';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, MouseEvent as ReactMouseEvent, MutableRefObject, SetStateAction, WheelEvent as ReactWheelEvent } from 'react';
 import { COLORS, MAP_VIEWBOX } from '../constants';
 import {
@@ -24,6 +24,154 @@ interface NJMapProps {
   onMunicipalityHover: (tooltip: MunicipalityHoverTooltip | null) => void;
 }
 
+interface ProjectedMunicipality {
+  id: string;
+  name: string;
+  county: string;
+  path: string;
+}
+
+interface ProjectedCounty {
+  id: string;
+  name: string;
+  path: string;
+  labelX: number;
+  labelY: number;
+}
+
+const StaticMapLayers = memo(function StaticMapLayers({
+  municipalities,
+  counties,
+}: {
+  municipalities: ProjectedMunicipality[];
+  counties: ProjectedCounty[];
+}) {
+  return (
+    <>
+      <g aria-label="Municipality base layer" className="municipality-base-layer">
+        {municipalities.map((municipality) => (
+          <path
+            key={`base-${municipality.id}`}
+            className="municipality-path"
+            d={municipality.path}
+            fill={COLORS.municipalFill}
+            stroke={COLORS.municipalStroke}
+            strokeWidth={0.9}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </g>
+
+      <g aria-label="County boundaries" className="county-layer">
+        {counties.map((county) => (
+          <path
+            key={county.id}
+            d={county.path}
+            fill="none"
+            stroke={COLORS.countyStroke}
+            strokeWidth={1.8}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </g>
+
+      <g aria-label="County labels" className="county-label-layer">
+        {counties.map((county) => (
+          <text
+            key={`label-${county.id}`}
+            className="county-label"
+            fill={COLORS.countyLabel}
+            x={county.labelX}
+            y={county.labelY}
+          >
+            {county.name}
+          </text>
+        ))}
+      </g>
+    </>
+  );
+});
+
+const DynamicMapLayers = memo(function DynamicMapLayers({
+  municipalitiesById,
+  visitedIds,
+  selectedId,
+}: {
+  municipalitiesById: Map<string, ProjectedMunicipality>;
+  visitedIds: Set<string>;
+  selectedId: string | null;
+}) {
+  return (
+    <>
+      <g aria-label="Visited fill layer" className="visited-layer">
+        {[...visitedIds].map((visitedId) => {
+          const municipality = municipalitiesById.get(visitedId);
+          if (!municipality) {
+            return null;
+          }
+          return (
+            <path
+              key={`visited-${visitedId}`}
+              d={municipality.path}
+              fill={COLORS.visitedFill}
+              pointerEvents="none"
+            />
+          );
+        })}
+      </g>
+
+      {selectedId ? (
+        <g aria-label="Selection layer" className="selection-layer">
+          {municipalitiesById.has(selectedId) ? (
+            <path
+              d={municipalitiesById.get(selectedId)?.path ?? ''}
+              fill="none"
+              stroke={COLORS.selectedStroke}
+              strokeWidth={2.4}
+              vectorEffect="non-scaling-stroke"
+            />
+          ) : null}
+        </g>
+      ) : null}
+    </>
+  );
+});
+
+const MunicipalityInteractionLayer = memo(function MunicipalityInteractionLayer({
+  municipalities,
+  onMunicipalityClick,
+  onMunicipalityHover,
+  dragMovedRef,
+}: {
+  municipalities: ProjectedMunicipality[];
+  onMunicipalityClick: (municipalityId: string) => void;
+  onMunicipalityHover: (event: ReactMouseEvent<SVGPathElement> | null, municipality: ProjectedMunicipality) => void;
+  dragMovedRef: MutableRefObject<boolean>;
+}) {
+  return (
+    <g aria-label="Municipality interaction layer" className="municipality-hit-layer">
+      {municipalities.map((municipality) => (
+        <path
+          key={`hit-${municipality.id}`}
+          className="municipality-hit-path"
+          d={municipality.path}
+          fill="transparent"
+          pointerEvents="all"
+          onClick={() => {
+            if (dragMovedRef.current) {
+              return;
+            }
+            onMunicipalityClick(municipality.id);
+          }}
+          onMouseEnter={(event) => onMunicipalityHover(event, municipality)}
+          onMouseMove={(event) => onMunicipalityHover(event, municipality)}
+          onMouseOut={() => onMunicipalityHover(null, municipality)}
+        />
+      ))}
+    </g>
+  );
+});
+
 export default function NJMap({
   municipalities,
   counties,
@@ -40,11 +188,52 @@ export default function NJMap({
     [counties],
   );
   const project = useMemo(() => buildProjector(bounds), [bounds]);
+  const projectedMunicipalities = useMemo<ProjectedMunicipality[]>(
+    () =>
+      municipalities.map((municipality) => ({
+        id: municipality.id,
+        name: municipality.name,
+        county: municipality.county,
+        path: geometryToPath(municipality.geometry as Geometry, project),
+      })),
+    [municipalities, project],
+  );
+  const projectedMunicipalitiesById = useMemo(() => {
+    const nextMap = new Map<string, ProjectedMunicipality>();
+    projectedMunicipalities.forEach((municipality) => {
+      nextMap.set(municipality.id, municipality);
+    });
+    return nextMap;
+  }, [projectedMunicipalities]);
+  const projectedCounties = useMemo<ProjectedCounty[]>(
+    () =>
+      counties.map((county) => {
+        const projectedLabelPoint = project(county.labelPoint);
+        return {
+          id: county.id,
+          name: county.name,
+          path: geometryToPath(county.geometry as Geometry, project),
+          labelX: projectedLabelPoint[0],
+          labelY: projectedLabelPoint[1],
+        };
+      }),
+    [counties, project],
+  );
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const onMunicipalityClickRef = useRef(onMunicipalityClick);
+  const onMunicipalityHoverRef = useRef(onMunicipalityHover);
   const isDraggingRef = useRef(false);
   const dragMovedRef = useRef(false);
   const lastDragPointRef = useRef<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    onMunicipalityClickRef.current = onMunicipalityClick;
+  }, [onMunicipalityClick]);
+
+  useEffect(() => {
+    onMunicipalityHoverRef.current = onMunicipalityHover;
+  }, [onMunicipalityHover]);
 
   useEffect(() => {
     function onWindowMouseMove(event: MouseEvent): void {
@@ -112,12 +301,27 @@ export default function NJMap({
     }
 
     const rect = svgRef.current.getBoundingClientRect();
-    onMunicipalityHover({
+    onMunicipalityHoverRef.current({
       x: event.clientX - rect.left + 12,
       y: event.clientY - rect.top + 14,
       text: `${municipalityName}, ${countyName}`,
     });
   }
+
+  const handleInteractionHover = useCallback(
+    (event: ReactMouseEvent<SVGPathElement> | null, municipality: ProjectedMunicipality) => {
+      if (!event) {
+        onMunicipalityHoverRef.current(null);
+        return;
+      }
+      emitHover(event, municipality.name, municipality.county);
+    },
+    [],
+  );
+
+  const handleInteractionClick = useCallback((municipalityId: string) => {
+    onMunicipalityClickRef.current(municipalityId);
+  }, []);
 
   function handleWheel(event: ReactWheelEvent<SVGSVGElement>): void {
     event.preventDefault();
@@ -160,85 +364,18 @@ export default function NJMap({
     >
       <rect fill={COLORS.mapBackground} height={MAP_VIEWBOX.height} width={MAP_VIEWBOX.width} x={0} y={0} />
       <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.k})`}>
-        <g aria-label="Municipalities" className="municipality-layer">
-          {municipalities.map((municipality) => {
-            const id = municipality.id;
-            const name = municipality.name;
-            const county = municipality.county;
-
-            return (
-              <path
-                key={id}
-                className="municipality-path"
-                d={geometryToPath(municipality.geometry as Geometry, project)}
-                fill={visitedIds.has(id) ? COLORS.visitedFill : COLORS.municipalFill}
-                onClick={() => {
-                  if (dragMovedRef.current) {
-                    return;
-                  }
-                  onMunicipalityClick(id);
-                }}
-                onMouseEnter={(event) => emitHover(event, name, county)}
-                onMouseMove={(event) => emitHover(event, name, county)}
-                onMouseOut={() => onMunicipalityHover(null)}
-                stroke={COLORS.municipalStroke}
-                strokeWidth={0.9}
-                vectorEffect="non-scaling-stroke"
-              />
-            );
-          })}
-        </g>
-
-        <g aria-label="County boundaries" className="county-layer">
-          {counties.map((county) => {
-            const id = county.id;
-            return (
-              <path
-                key={id}
-                d={geometryToPath(county.geometry as Geometry, project)}
-                fill="none"
-                stroke={COLORS.countyStroke}
-                strokeWidth={1.8}
-                vectorEffect="non-scaling-stroke"
-              />
-            );
-          })}
-        </g>
-
-        {selectedId ? (
-          <g aria-label="Selection layer" className="selection-layer">
-            {municipalities
-              .filter((municipality) => municipality.id === selectedId)
-              .map((municipality) => (
-                <path
-                  key={`selected-${selectedId}`}
-                  d={geometryToPath(municipality.geometry as Geometry, project)}
-                  fill="none"
-                  stroke={COLORS.selectedStroke}
-                  strokeWidth={2.4}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
-          </g>
-        ) : null}
-
-        <g aria-label="County labels" className="county-label-layer">
-          {counties.map((county) => {
-            const projected = project(county.labelPoint);
-
-            return (
-              <text
-                key={`label-${county.id}`}
-                className="county-label"
-                fill={COLORS.countyLabel}
-                x={projected[0]}
-                y={projected[1]}
-              >
-                {county.name}
-              </text>
-            );
-          })}
-        </g>
+        <StaticMapLayers counties={projectedCounties} municipalities={projectedMunicipalities} />
+        <DynamicMapLayers
+          municipalitiesById={projectedMunicipalitiesById}
+          selectedId={selectedId}
+          visitedIds={visitedIds}
+        />
+        <MunicipalityInteractionLayer
+          dragMovedRef={dragMovedRef}
+          municipalities={projectedMunicipalities}
+          onMunicipalityClick={handleInteractionClick}
+          onMunicipalityHover={handleInteractionHover}
+        />
       </g>
     </svg>
   );
