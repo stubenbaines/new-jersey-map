@@ -226,7 +226,11 @@ textarea {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.03em;
+  paint-order: stroke fill;
   pointer-events: none;
+  stroke: rgba(248, 248, 248, 0.95);
+  stroke-linejoin: round;
+  stroke-width: 2.5px;
   text-anchor: middle;
   text-transform: uppercase;
 }

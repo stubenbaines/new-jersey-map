@@ -74,21 +74,29 @@ const StaticMapLayers = memo(function StaticMapLayers({
           />
         ))}
       </g>
-
-      <g aria-label="County labels" className="county-label-layer">
-        {counties.map((county) => (
-          <text
-            key={`label-${county.id}`}
-            className="county-label"
-            fill={COLORS.countyLabel}
-            x={county.labelX}
-            y={county.labelY}
-          >
-            {county.name}
-          </text>
-        ))}
-      </g>
     </>
+  );
+});
+
+const CountyLabelsLayer = memo(function CountyLabelsLayer({
+  counties,
+}: {
+  counties: ProjectedCounty[];
+}) {
+  return (
+    <g aria-label="County labels" className="county-label-layer">
+      {counties.map((county) => (
+        <text
+          key={`label-${county.id}`}
+          className="county-label"
+          fill={COLORS.countyLabel}
+          x={county.labelX}
+          y={county.labelY}
+        >
+          {county.name}
+        </text>
+      ))}
+    </g>
   );
 });
 
@@ -376,6 +384,7 @@ export default function NJMap({
           onMunicipalityClick={handleInteractionClick}
           onMunicipalityHover={handleInteractionHover}
         />
+        <CountyLabelsLayer counties={projectedCounties} />
       </g>
     </svg>
   );
