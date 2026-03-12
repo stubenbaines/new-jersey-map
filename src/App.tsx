@@ -1,7 +1,7 @@
 import type { Geometry } from 'geojson';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NJMap from './components/NJMap';
-import { COLORS, MAP_VIEWBOX, STORAGE_KEY } from './constants';
+import { MAP_VIEWBOX, STORAGE_KEY } from './constants';
 import {
   buildProjector,
   computeGeometryBounds,
@@ -414,13 +414,13 @@ function App() {
   }
 
   return (
-    <div className="app-shell" style={{ backgroundColor: COLORS.pageBackground }}>
+    <div className="app-shell">
       <header className="app-header">
         <h1>NJ Visits Tracker</h1>
       </header>
 
       <main className="app-main">
-        <aside className="sidebar" style={{ backgroundColor: COLORS.panelBackground }}>
+        <aside className="sidebar">
           <section className="sidebar-section">
             <h2>Search</h2>
             <input
@@ -607,7 +607,7 @@ function App() {
           </section>
         </aside>
 
-        <section className="map-panel" style={{ backgroundColor: COLORS.panelBackground }}>
+        <section className="map-panel">
           {error ? (
             <div className="warning-box" role="alert">
               <p>Failed to load map data: {error}</p>
