@@ -1,5 +1,5 @@
 import type { Geometry } from 'geojson';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NJMap from './components/NJMap';
 import { COLORS, MAP_VIEWBOX, STORAGE_KEY } from './constants';
 import {
@@ -107,6 +107,8 @@ function App() {
   const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set(persisted.state.visitedIds));
   const [transform, setTransform] = useState<MapTransform>(persisted.state.lastTransform);
   const mapSvgElementRef = useRef<SVGSVGElement | null>(null);
+  const hoverTooltipRafRef = useRef<number | null>(null);
+  const pendingHoverTooltipRef = useRef<MunicipalityHoverTooltip | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -201,7 +203,7 @@ function App() {
     return buildProjector(bounds);
   }, [data]);
 
-  function toggleMunicipalityVisited(municipalityId: string): void {
+  const toggleMunicipalityVisited = useCallback((municipalityId: string): void => {
     setSelectedId(municipalityId);
     setVisitedIds((previous) => {
       const next = new Set(previous);
@@ -212,13 +214,44 @@ function App() {
       }
       return next;
     });
-  }
+  }, []);
 
-  function handleMunicipalityClick(municipalityId: string): void {
+  const handleMunicipalityClick = useCallback((municipalityId: string): void => {
     toggleMunicipalityVisited(municipalityId);
-  }
+  }, [toggleMunicipalityVisited]);
 
-  function handleSearchSelect(municipalityId: string): void {
+  const handleMapHover = useCallback((tooltip: MunicipalityHoverTooltip | null): void => {
+    if (!tooltip) {
+      pendingHoverTooltipRef.current = null;
+      if (hoverTooltipRafRef.current !== null) {
+        window.cancelAnimationFrame(hoverTooltipRafRef.current);
+        hoverTooltipRafRef.current = null;
+      }
+      setHoverTooltip(null);
+      return;
+    }
+
+    pendingHoverTooltipRef.current = tooltip;
+    if (hoverTooltipRafRef.current !== null) {
+      return;
+    }
+
+    hoverTooltipRafRef.current = window.requestAnimationFrame(() => {
+      hoverTooltipRafRef.current = null;
+      setHoverTooltip(pendingHoverTooltipRef.current);
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTooltipRafRef.current !== null) {
+        window.cancelAnimationFrame(hoverTooltipRafRef.current);
+        hoverTooltipRafRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleSearchSelect = useCallback((municipalityId: string): void => {
     toggleMunicipalityVisited(municipalityId);
     setSearchQuery('');
     setActiveResultIndex(-1);
@@ -239,7 +272,7 @@ function App() {
         k,
       };
     });
-  }
+  }, [municipalitiesById, projectForCentering, toggleMunicipalityVisited]);
 
   async function handleExportPng(): Promise<void> {
     if (!mapSvgElementRef.current) {
@@ -592,7 +625,7 @@ function App() {
                 counties={data.counties}
                 municipalities={data.municipalities}
                 onMunicipalityClick={handleMunicipalityClick}
-                onMunicipalityHover={setHoverTooltip}
+                onMunicipalityHover={handleMapHover}
                 onTransformChange={setTransform}
                 selectedId={selectedId}
                 svgElementRef={mapSvgElementRef}
