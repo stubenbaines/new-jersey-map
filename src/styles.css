@@ -25,6 +25,31 @@
   font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
 }
 
+body[data-theme='lcars'] {
+  --bg-page: #1d1730;
+  --bg-page-accent: #2f244c;
+  --bg-panel: #211a34;
+  --bg-map: #2b223f;
+  --text-primary: #f8efe2;
+  --text-muted: #d8c5a9;
+  --border-1: #f09865;
+  --border-2: #6c4f8b;
+  --accent: #f2a15b;
+  --accent-strong: #c96e47;
+  --btn-bg: #f5b073;
+  --btn-bg-hover: #f7be8b;
+  --btn-border: #7f5aa3;
+  --btn-text: #281f3d;
+  --btn-disabled-bg: #5d4d76;
+  --btn-disabled-border: #7e6c98;
+  --btn-disabled-text: #dacfbf;
+  --input-bg: #efe8dc;
+  --warning-bg: #3a2c52;
+  --warning-border: #f3a36a;
+  --error-text: #ff8e8e;
+  --tooltip-bg: rgba(241, 164, 96, 0.97);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -48,6 +73,12 @@ textarea {
   padding: 16px;
 }
 
+body[data-theme='lcars'] .app-shell {
+  background:
+    linear-gradient(90deg, rgba(243, 161, 91, 0.14), transparent 38%),
+    radial-gradient(circle at top right, rgba(125, 90, 164, 0.22), transparent 45%);
+}
+
 .app-header {
   background: linear-gradient(90deg, var(--accent-strong), var(--accent));
   border: 1px solid var(--accent-strong);
@@ -65,6 +96,13 @@ textarea {
   margin-top: 8px;
   width: 120px;
   background: rgba(255, 255, 255, 0.7);
+}
+
+body[data-theme='lcars'] .app-header::after {
+  background: rgba(42, 30, 58, 0.5);
+  border-radius: 99px;
+  height: 4px;
+  width: 190px;
 }
 
 .app-header h1 {
@@ -111,6 +149,10 @@ textarea {
   font-size: 0.95rem;
   margin: 0 0 8px;
   letter-spacing: 0.01em;
+}
+
+body[data-theme='lcars'] .sidebar-section h2 {
+  color: #f4ae79;
 }
 
 .sidebar input,
@@ -165,6 +207,10 @@ textarea {
   border-color: var(--accent);
 }
 
+body[data-theme='lcars'] .search-result-button.is-active {
+  color: #2c1f44;
+}
+
 .button-stack {
   display: grid;
   gap: 8px;
@@ -185,6 +231,10 @@ textarea {
   background: var(--btn-bg-hover);
   border-color: var(--accent);
   transform: translateY(-1px);
+}
+
+body[data-theme='lcars'] .button-stack button {
+  border-radius: 14px;
 }
 
 .button-stack button:disabled {
@@ -236,6 +286,42 @@ textarea:focus-visible {
   background: #fffef8;
   cursor: pointer;
   padding: 5px 8px;
+}
+
+body[data-theme='lcars'] .warning-box button {
+  color: #261f3a;
+}
+
+.theme-toggle {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.theme-button {
+  border: 1px solid var(--btn-border);
+  border-radius: 99px;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 7px 10px;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.theme-button:hover {
+  background: var(--btn-bg-hover);
+  border-color: var(--accent);
+}
+
+.theme-button.is-active {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+  color: #f8fcff;
+}
+
+body[data-theme='lcars'] .theme-button.is-active {
+  color: #2a1e40;
 }
 
 .import-report {
@@ -293,6 +379,10 @@ textarea:focus-visible {
   position: absolute;
   white-space: nowrap;
   z-index: 4;
+}
+
+body[data-theme='lcars'] .map-tooltip {
+  color: #1f1732;
 }
 
 .county-label {

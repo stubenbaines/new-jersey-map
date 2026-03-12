@@ -38,6 +38,10 @@ interface ImportReport {
   unmatched: ImportIssue[];
 }
 
+type ThemeMode = 'default' | 'lcars';
+
+const THEME_STORAGE_KEY = 'nj-visits:theme';
+
 function normalizeSearchText(value: string): string {
   return value
     .toLowerCase()
@@ -101,6 +105,14 @@ function App() {
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
   const [listExportError, setListExportError] = useState<string | null>(null);
   const [storageSaveError, setStorageSaveError] = useState<string | null>(null);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    try {
+      const persistedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+      return persistedTheme === 'lcars' ? 'lcars' : 'default';
+    } catch {
+      return 'default';
+    }
+  });
 
   const persisted = useMemo(() => loadPersistedState(), []);
   const [storageLoadWarning, setStorageLoadWarning] = useState<string | null>(persisted.warning);
@@ -146,6 +158,18 @@ function App() {
     });
     setStorageSaveError(saveError);
   }, [transform, visitedIds]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+    } catch {
+      // Ignore theme persistence errors and keep current in-memory theme.
+    }
+    document.body.dataset.theme = themeMode;
+    return () => {
+      delete document.body.dataset.theme;
+    };
+  }, [themeMode]);
 
   const municipalityCount = data?.meta.municipalityCount ?? 0;
   const countyCount = data?.meta.countyCount ?? 0;
@@ -589,19 +613,21 @@ function App() {
           </section>
 
           <section className="sidebar-section">
-            <h2>Quick Testing</h2>
-            <div className="button-stack">
+            <h2>Theme</h2>
+            <div aria-label="Theme mode" className="theme-toggle" role="group">
               <button
-                onClick={() => {
-                  if (!data || data.municipalities.length === 0) {
-                    return;
-                  }
-                  const randomMunicipality = data.municipalities[Math.floor(Math.random() * data.municipalities.length)];
-                  toggleMunicipalityVisited(randomMunicipality.id);
-                }}
+                className={`theme-button ${themeMode === 'default' ? 'is-active' : ''}`}
+                onClick={() => setThemeMode('default')}
                 type="button"
               >
-                Toggle Random Municipality
+                Default
+              </button>
+              <button
+                className={`theme-button ${themeMode === 'lcars' ? 'is-active' : ''}`}
+                onClick={() => setThemeMode('lcars')}
+                type="button"
+              >
+                LCARS
               </button>
             </div>
           </section>

@@ -71,6 +71,7 @@ npm run tauri:build
 - CSV export of visited municipalities (county-grouped, alphabetical)
 - Reset progress action (clears local state + resets view)
 - Recovery UI for data load failures and storage parse/save failures
+- Theme switcher with default and optional LCARS-inspired skin
 
 ## Known Limitations
 - SVG-to-PNG export behavior is browser-dependent and should be validated across target browsers.
