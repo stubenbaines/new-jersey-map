@@ -41,40 +41,45 @@ interface ProjectedCounty {
 
 const StaticMapLayers = memo(function StaticMapLayers({
   municipalities,
-  counties,
 }: {
   municipalities: ProjectedMunicipality[];
+}) {
+  return (
+    <g aria-label="Municipality base layer" className="municipality-base-layer">
+      {municipalities.map((municipality) => (
+        <path
+          key={`base-${municipality.id}`}
+          className="municipality-path"
+          d={municipality.path}
+          fill={COLORS.municipalFill}
+          stroke={COLORS.municipalStroke}
+          strokeWidth={0.9}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </g>
+  );
+});
+
+const CountyBoundariesLayer = memo(function CountyBoundariesLayer({
+  counties,
+}: {
   counties: ProjectedCounty[];
 }) {
   return (
-    <>
-      <g aria-label="Municipality base layer" className="municipality-base-layer">
-        {municipalities.map((municipality) => (
-          <path
-            key={`base-${municipality.id}`}
-            className="municipality-path"
-            d={municipality.path}
-            fill={COLORS.municipalFill}
-            stroke={COLORS.municipalStroke}
-            strokeWidth={0.9}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-      </g>
-
-      <g aria-label="County boundaries" className="county-layer">
-        {counties.map((county) => (
-          <path
-            key={county.id}
-            d={county.path}
-            fill="none"
-            stroke={COLORS.countyStroke}
-            strokeWidth={1.8}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-      </g>
-    </>
+    <g aria-label="County boundaries" className="county-layer">
+      {counties.map((county) => (
+        <path
+          key={county.id}
+          d={county.path}
+          fill="none"
+          pointerEvents="none"
+          stroke={COLORS.countyStroke}
+          strokeWidth={1.8}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </g>
   );
 });
 
@@ -372,12 +377,13 @@ export default function NJMap({
     >
       <rect fill={COLORS.mapBackground} height={MAP_VIEWBOX.height} width={MAP_VIEWBOX.width} x={0} y={0} />
       <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.k})`}>
-        <StaticMapLayers counties={projectedCounties} municipalities={projectedMunicipalities} />
+        <StaticMapLayers municipalities={projectedMunicipalities} />
         <DynamicMapLayers
           municipalitiesById={projectedMunicipalitiesById}
           selectedId={selectedId}
           visitedIds={visitedIds}
         />
+        <CountyBoundariesLayer counties={projectedCounties} />
         <MunicipalityInteractionLayer
           dragMovedRef={dragMovedRef}
           municipalities={projectedMunicipalities}

@@ -173,6 +173,8 @@ function App() {
 
   const municipalityCount = data?.meta.municipalityCount ?? 0;
   const countyCount = data?.meta.countyCount ?? 0;
+  const visitedPercentage = municipalityCount > 0 ? (visitedIds.size / municipalityCount) * 100 : 0;
+  const visitedPercentageLabel = `${visitedPercentage.toFixed(1)}%`;
   const canUseMapControls = Boolean(data) && !error;
 
   const searchIndex = useMemo<SearchResultItem[]>(() => {
@@ -658,6 +660,9 @@ function App() {
                 transform={transform}
                 visitedIds={visitedIds}
               />
+              <div className="map-visit-percentage" role="status">
+                {`Visited: ${visitedIds.size} / ${municipalityCount} (${visitedPercentageLabel})`}
+              </div>
               {hoverTooltip ? (
                 <div
                   aria-live="polite"
