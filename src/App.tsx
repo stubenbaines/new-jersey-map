@@ -533,7 +533,7 @@ function App() {
                 Zoom Out
               </button>
               <button disabled={!canUseMapControls} onClick={() => setTransform(DEFAULT_MAP_TRANSFORM)} type="button">
-                Reset View
+                Fit in Window
               </button>
             </div>
             <div className="button-stack">
@@ -544,7 +544,7 @@ function App() {
                 Export Visited CSV
               </button>
               <button disabled={!canUseMapControls} onClick={handleResetProgressWithConfirmation} type="button">
-                Reset Progress
+                Clear Map
               </button>
             </div>
             {exportError ? <p className="error">{exportError}</p> : null}
