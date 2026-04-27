@@ -1,4 +1,4 @@
-import { STORAGE_KEY } from '../constants';
+import { COLORS, STORAGE_KEY } from '../constants';
 import { normalizeTransform } from './mapTransform';
 import { DEFAULT_MAP_TRANSFORM } from '../types/state';
 import type { PersistedState } from '../types/state';
@@ -6,7 +6,10 @@ import type { PersistedState } from '../types/state';
 const DEFAULT_STATE: PersistedState = {
   visitedIds: [],
   lastTransform: DEFAULT_MAP_TRANSFORM,
+  visitedFillColor: COLORS.visitedFill,
 };
+
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 export interface LoadedPersistedState {
   state: PersistedState;
@@ -39,6 +42,10 @@ export function loadPersistedState(): LoadedPersistedState {
           ? parsed.visitedIds.filter((value): value is string => typeof value === 'string')
           : [],
         lastTransform: normalizeTransform(parsed.lastTransform),
+        visitedFillColor:
+          typeof parsed.visitedFillColor === 'string' && HEX_COLOR_PATTERN.test(parsed.visitedFillColor)
+            ? parsed.visitedFillColor
+            : COLORS.visitedFill,
       },
       warning: null,
     };

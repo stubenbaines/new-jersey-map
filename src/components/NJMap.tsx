@@ -16,7 +16,7 @@ interface NJMapProps {
   municipalities: MunicipalityRecord[];
   counties: CountyRecord[];
   visitedIds: Set<string>;
-  selectedId: string | null;
+  visitedFillColor: string;
   transform: MapTransform;
   svgElementRef?: MutableRefObject<SVGSVGElement | null>;
   onTransformChange: Dispatch<SetStateAction<MapTransform>>;
@@ -52,6 +52,28 @@ const StaticMapLayers = memo(function StaticMapLayers({
           className="municipality-path"
           d={municipality.path}
           fill={COLORS.municipalFill}
+          stroke={COLORS.municipalStroke}
+          strokeWidth={0.9}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+    </g>
+  );
+});
+
+const MunicipalityBoundariesLayer = memo(function MunicipalityBoundariesLayer({
+  municipalities,
+}: {
+  municipalities: ProjectedMunicipality[];
+}) {
+  return (
+    <g aria-label="Municipality boundaries" className="municipality-boundary-layer">
+      {municipalities.map((municipality) => (
+        <path
+          key={`boundary-${municipality.id}`}
+          d={municipality.path}
+          fill="none"
+          pointerEvents="none"
           stroke={COLORS.municipalStroke}
           strokeWidth={0.9}
           vectorEffect="non-scaling-stroke"
@@ -108,45 +130,29 @@ const CountyLabelsLayer = memo(function CountyLabelsLayer({
 const DynamicMapLayers = memo(function DynamicMapLayers({
   municipalitiesById,
   visitedIds,
-  selectedId,
+  visitedFillColor,
 }: {
   municipalitiesById: Map<string, ProjectedMunicipality>;
   visitedIds: Set<string>;
-  selectedId: string | null;
+  visitedFillColor: string;
 }) {
   return (
-    <>
-      <g aria-label="Visited fill layer" className="visited-layer">
-        {[...visitedIds].map((visitedId) => {
-          const municipality = municipalitiesById.get(visitedId);
-          if (!municipality) {
-            return null;
-          }
-          return (
-            <path
-              key={`visited-${visitedId}`}
-              d={municipality.path}
-              fill={COLORS.visitedFill}
-              pointerEvents="none"
-            />
-          );
-        })}
-      </g>
-
-      {selectedId ? (
-        <g aria-label="Selection layer" className="selection-layer">
-          {municipalitiesById.has(selectedId) ? (
-            <path
-              d={municipalitiesById.get(selectedId)?.path ?? ''}
-              fill="none"
-              stroke={COLORS.selectedStroke}
-              strokeWidth={2.4}
-              vectorEffect="non-scaling-stroke"
-            />
-          ) : null}
-        </g>
-      ) : null}
-    </>
+    <g aria-label="Visited fill layer" className="visited-layer">
+      {[...visitedIds].map((visitedId) => {
+        const municipality = municipalitiesById.get(visitedId);
+        if (!municipality) {
+          return null;
+        }
+        return (
+          <path
+            key={`visited-${visitedId}`}
+            d={municipality.path}
+            fill={visitedFillColor}
+            pointerEvents="none"
+          />
+        );
+      })}
+    </g>
   );
 });
 
@@ -189,7 +195,7 @@ export default function NJMap({
   municipalities,
   counties,
   visitedIds,
-  selectedId,
+  visitedFillColor,
   transform,
   svgElementRef,
   onTransformChange,
@@ -380,9 +386,10 @@ export default function NJMap({
         <StaticMapLayers municipalities={projectedMunicipalities} />
         <DynamicMapLayers
           municipalitiesById={projectedMunicipalitiesById}
-          selectedId={selectedId}
+          visitedFillColor={visitedFillColor}
           visitedIds={visitedIds}
         />
+        <MunicipalityBoundariesLayer municipalities={projectedMunicipalities} />
         <CountyBoundariesLayer counties={projectedCounties} />
         <MunicipalityInteractionLayer
           dragMovedRef={dragMovedRef}

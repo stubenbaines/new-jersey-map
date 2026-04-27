@@ -1,7 +1,7 @@
 import type { Geometry } from 'geojson';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NJMap from './components/NJMap';
-import { MAP_VIEWBOX, STORAGE_KEY } from './constants';
+import { COLORS, MAP_VIEWBOX, STORAGE_KEY } from './constants';
 import {
   buildProjector,
   computeGeometryBounds,
@@ -41,6 +41,7 @@ interface ImportReport {
 type ThemeMode = 'default' | 'lcars';
 
 const THEME_STORAGE_KEY = 'nj-visits:theme';
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 function normalizeSearchText(value: string): string {
   return value
@@ -117,6 +118,8 @@ function App() {
   const persisted = useMemo(() => loadPersistedState(), []);
   const [storageLoadWarning, setStorageLoadWarning] = useState<string | null>(persisted.warning);
   const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set(persisted.state.visitedIds));
+  const [visitedFillColor, setVisitedFillColor] = useState(persisted.state.visitedFillColor);
+  const [visitedFillColorInput, setVisitedFillColorInput] = useState(persisted.state.visitedFillColor);
   const [transform, setTransform] = useState<MapTransform>(persisted.state.lastTransform);
   const mapSvgElementRef = useRef<SVGSVGElement | null>(null);
   const hoverTooltipRafRef = useRef<number | null>(null);
@@ -155,9 +158,10 @@ function App() {
     const saveError = savePersistedState({
       visitedIds: [...visitedIds],
       lastTransform: transform,
+      visitedFillColor,
     });
     setStorageSaveError(saveError);
-  }, [transform, visitedIds]);
+  }, [transform, visitedFillColor, visitedIds]);
 
   useEffect(() => {
     try {
@@ -309,7 +313,10 @@ function App() {
     setExportError(null);
     setIsExportingPng(true);
     try {
-      await exportSvgAsPng(mapSvgElementRef.current);
+      await exportSvgAsPng(
+        mapSvgElementRef.current,
+        `Visited: ${visitedIds.size} / ${municipalityCount} (${visitedPercentageLabel})`,
+      );
     } catch (exportFailure) {
       setExportError(exportFailure instanceof Error ? exportFailure.message : 'PNG export failed.');
     } finally {
@@ -324,6 +331,8 @@ function App() {
       // Keep UI state reset even if storage deletion fails.
     }
     setVisitedIds(new Set());
+    setVisitedFillColor(COLORS.visitedFill);
+    setVisitedFillColorInput(COLORS.visitedFill);
     setSelectedId(null);
     setTransform(DEFAULT_MAP_TRANSFORM);
     setImportReport(null);
@@ -568,6 +577,39 @@ function App() {
           </section>
 
           <section className="sidebar-section">
+            <h2>Fill Color</h2>
+            <div className="color-control">
+              <input
+                aria-label="Visited municipality fill color picker"
+                disabled={!canUseMapControls}
+                onChange={(event) => {
+                  setVisitedFillColor(event.target.value);
+                  setVisitedFillColorInput(event.target.value);
+                }}
+                type="color"
+                value={visitedFillColor}
+              />
+              <input
+                aria-label="Visited municipality fill hex color"
+                disabled={!canUseMapControls}
+                inputMode="text"
+                maxLength={7}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setVisitedFillColorInput(nextValue);
+                  if (HEX_COLOR_PATTERN.test(nextValue)) {
+                    setVisitedFillColor(nextValue);
+                  }
+                }}
+                onBlur={() => setVisitedFillColorInput(visitedFillColor)}
+                spellCheck={false}
+                type="text"
+                value={visitedFillColorInput}
+              />
+            </div>
+          </section>
+
+          <section className="sidebar-section">
             <h2>Import Visited List</h2>
             <textarea
               aria-label="Import visited municipalities list"
@@ -655,9 +697,9 @@ function App() {
                 onMunicipalityClick={handleMunicipalityClick}
                 onMunicipalityHover={handleMapHover}
                 onTransformChange={setTransform}
-                selectedId={selectedId}
                 svgElementRef={mapSvgElementRef}
                 transform={transform}
+                visitedFillColor={visitedFillColor}
                 visitedIds={visitedIds}
               />
               <div className="map-visit-percentage" role="status">

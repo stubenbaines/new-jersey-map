@@ -13,4 +13,5 @@ export const DEFAULT_MAP_TRANSFORM: MapTransform = {
 export interface PersistedState {
   visitedIds: string[];
   lastTransform: MapTransform;
+  visitedFillColor: string;
 }

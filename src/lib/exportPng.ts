@@ -53,7 +53,46 @@ function formatDateForFile(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export async function exportSvgAsPng(svgElement: SVGSVGElement): Promise<void> {
+function appendProgressLabel(svgElement: SVGSVGElement, label: string): void {
+  const namespace = 'http://www.w3.org/2000/svg';
+  const viewBoxParts = svgElement.getAttribute('viewBox')?.split(/\s+/).map(Number) ?? [];
+  const width = Number.isFinite(viewBoxParts[2]) && viewBoxParts[2] > 0
+    ? viewBoxParts[2]
+    : Number(svgElement.getAttribute('width')) || 900;
+  const padding = 14;
+  const labelWidth = Math.min(width - padding * 2, Math.max(190, label.length * 7.2 + 24));
+  const labelHeight = 30;
+  const x = width - padding - labelWidth;
+  const y = padding;
+
+  const group = document.createElementNS(namespace, 'g');
+  group.setAttribute('aria-label', 'Visited municipality progress');
+
+  const background = document.createElementNS(namespace, 'rect');
+  background.setAttribute('x', `${x}`);
+  background.setAttribute('y', `${y}`);
+  background.setAttribute('width', `${labelWidth}`);
+  background.setAttribute('height', `${labelHeight}`);
+  background.setAttribute('rx', '15');
+  background.setAttribute('fill', '#ffffff');
+  background.setAttribute('stroke', '#c8d4e5');
+  background.setAttribute('stroke-width', '1');
+
+  const text = document.createElementNS(namespace, 'text');
+  text.textContent = label;
+  text.setAttribute('x', `${x + labelWidth / 2}`);
+  text.setAttribute('y', `${y + 20}`);
+  text.setAttribute('fill', '#1a2432');
+  text.setAttribute('font-family', 'Avenir Next, Trebuchet MS, Segoe UI, sans-serif');
+  text.setAttribute('font-size', '13');
+  text.setAttribute('font-weight', '700');
+  text.setAttribute('text-anchor', 'middle');
+
+  group.append(background, text);
+  svgElement.append(group);
+}
+
+export async function exportSvgAsPng(svgElement: SVGSVGElement, progressLabel?: string): Promise<void> {
   const rect = svgElement.getBoundingClientRect();
   const width = Math.max(1, Math.round(rect.width));
   const height = Math.max(1, Math.round(rect.height));
@@ -64,6 +103,9 @@ export async function exportSvgAsPng(svgElement: SVGSVGElement): Promise<void> {
   clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   clonedSvg.setAttribute('width', `${width}`);
   clonedSvg.setAttribute('height', `${height}`);
+  if (progressLabel) {
+    appendProgressLabel(clonedSvg, progressLabel);
+  }
 
   const serialized = new XMLSerializer().serializeToString(clonedSvg);
   const encoded = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialized)}`;

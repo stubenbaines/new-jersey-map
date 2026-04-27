@@ -48,6 +48,11 @@ Prerequisites:
   cargo install tauri-cli --locked
   ```
 
+To generate new icons run:
+```bash
+cargo tauri icon path/to/source-image.png
+```
+
 Run desktop app in dev mode:
 ```bash
 npm run tauri:dev
